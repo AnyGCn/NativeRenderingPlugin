@@ -19,9 +19,9 @@
 #if _MSC_VER
 	#define UNITY_WIN 1
 #elif defined(__APPLE__)
-    #if TARGET_OS_TV
+    #if defined(TARGET_OS_TV)
         #define UNITY_TVOS 1
-    #elif TARGET_OS_IOS
+    #elif defined(TARGET_OS_IOS)
         #define UNITY_IOS 1
 	#else
 		#define UNITY_OSX 1
@@ -51,7 +51,7 @@
 	#define SUPPORT_OPENGL_UNIFIED 1
 	#define SUPPORT_OPENGL_CORE 1
 	#define SUPPORT_VULKAN 0 // Requires Vulkan SDK to be installed
-#elif UNITY_IOS || UNITY_TVOS || UNITY_ANDROID || UNITY_WEBGL
+#elif UNITY_ANDROID || UNITY_WEBGL
 	#ifndef SUPPORT_OPENGL_ES
 		#define SUPPORT_OPENGL_ES 1
 	#endif
@@ -59,7 +59,7 @@
 	#ifndef SUPPORT_VULKAN
 		#define SUPPORT_VULKAN 0
 	#endif
-#elif UNITY_OSX || UNITY_LINUX
+#elif UNITY_LINUX
 	#define SUPPORT_OPENGL_UNIFIED 1
 	#define SUPPORT_OPENGL_CORE 1
 #elif UNITY_EMBEDDED_LINUX

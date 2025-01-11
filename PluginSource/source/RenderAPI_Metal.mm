@@ -10,7 +10,7 @@
 
 #include "Unity/IUnityGraphicsMetal.h"
 #import <Metal/Metal.h>
-
+#import <MetalFX/MetalFX.h>
 
 class RenderAPI_Metal : public RenderAPI
 {
@@ -30,16 +30,22 @@ public:
 	virtual void* BeginModifyVertexBuffer(void* bufferHandle, size_t* outBufferSize);
 	virtual void EndModifyVertexBuffer(void* bufferHandle);
 
+    virtual void UpscaleTexture(void* data);
+    
 private:
 	void CreateResources();
 
 private:
-	IUnityGraphicsMetal*	m_MetalGraphics;
+    IUnityGraphicsMetalV2*	m_MetalGraphics;
 	id<MTLBuffer>			m_VertexBuffer;
 	id<MTLBuffer>			m_ConstantBuffer;
 
 	id<MTLDepthStencilState> m_DepthStencil;
 	id<MTLRenderPipelineState>	m_Pipeline;
+    
+    id<MTLTexture>          m_src;
+    id<MTLTexture>          m_dst;
+    id<MTLFXSpatialScaler>  m_scaler;
 };
 
 
@@ -52,6 +58,7 @@ RenderAPI* CreateRenderAPI_Metal()
 static Class MTLVertexDescriptorClass;
 static Class MTLRenderPipelineDescriptorClass;
 static Class MTLDepthStencilDescriptorClass;
+static Class MTLFXSpatialScalerDescriptorClass;
 const int kVertexSize = 12 + 4;
 
 // Simple vertex & fragment shader source
@@ -161,6 +168,29 @@ void RenderAPI_Metal::CreateResources()
 	depthDesc.depthCompareFunction = GetUsesReverseZ() ? MTLCompareFunctionGreaterEqual : MTLCompareFunctionLessEqual;
 	depthDesc.depthWriteEnabled = false;
 	m_DepthStencil = [metalDevice newDepthStencilStateWithDescriptor:depthDesc];
+    
+    MTLTextureDescriptor* texDesc = [[MTLTextureDescriptor alloc] init];
+    texDesc.width = 512;
+    texDesc.height = 512;
+    texDesc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite | MTLTextureUsageRenderTarget;
+    texDesc.storageMode = MTLStorageModePrivate;
+    texDesc.pixelFormat = MTLPixelFormatBGRA8Unorm_sRGB;
+    m_src = [metalDevice newTextureWithDescriptor:texDesc];
+    texDesc.width = 1024;
+    texDesc.height = 1024;
+    m_dst = [metalDevice newTextureWithDescriptor:texDesc];
+    
+    
+    MTLFXSpatialScalerDescriptor* description = [[MTLFXSpatialScalerDescriptorClass alloc] init];
+    description.inputWidth = m_src.width;
+    description.inputHeight = m_src.height;
+    description.outputWidth = m_dst.width;
+    description.outputHeight = m_dst.height;
+    description.colorTextureFormat = m_src.pixelFormat;
+    description.outputTextureFormat = m_dst.pixelFormat;
+    description.colorProcessingMode = MTLFXSpatialScalerColorProcessingModePerceptual;
+    
+    m_scaler = [description newSpatialScalerWithDevice:metalDevice];
 }
 
 
@@ -173,11 +203,12 @@ void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
 {
 	if (type == kUnityGfxDeviceEventInitialize)
 	{
-		m_MetalGraphics = interfaces->Get<IUnityGraphicsMetal>();
+		m_MetalGraphics = interfaces->Get<IUnityGraphicsMetalV2>();
 		MTLVertexDescriptorClass            = NSClassFromString(@"MTLVertexDescriptor");
 		MTLRenderPipelineDescriptorClass    = NSClassFromString(@"MTLRenderPipelineDescriptor");
 		MTLDepthStencilDescriptorClass      = NSClassFromString(@"MTLDepthStencilDescriptor");
-
+        MTLFXSpatialScalerDescriptorClass =
+            NSClassFromString(@"MTLFXSpatialScalerDescriptor");
 		CreateResources();
 	}
 	else if (type == kUnityGfxDeviceEventShutdown)
@@ -254,5 +285,48 @@ void RenderAPI_Metal::EndModifyVertexBuffer(void* bufferHandle)
 #	endif // if UNITY_OSX
 }
 
+struct UpscaleTextureData
+{
+    void* input;
+    void* output;
+};
+
+void RenderAPI_Metal::UpscaleTexture(void* data) API_AVAILABLE(ios(16.0), macosx(13.0))
+{
+    UpscaleTextureData* upscaleTextureData = (UpscaleTextureData*)data;
+    
+    id<MTLTexture> input = (__bridge id<MTLTexture>)upscaleTextureData->input;
+    id<MTLTexture> output = (__bridge id<MTLTexture>)upscaleTextureData->output;
+    id<MTLDevice> metalDevice = m_MetalGraphics->MetalDevice();
+
+    if (m_scaler == nil ||
+        m_scaler.inputWidth != input.width ||
+        m_scaler.inputHeight != input.height ||
+        m_scaler.outputWidth != output.width ||
+        m_scaler.outputHeight != output.height ||
+        m_scaler.colorTextureFormat != input.pixelFormat ||
+        m_scaler.outputTextureFormat != output.pixelFormat)
+    {
+        MTLFXSpatialScalerDescriptor* description = [[MTLFXSpatialScalerDescriptorClass alloc] init];
+        description.inputWidth = input.width;
+        description.inputHeight = input.height;
+        description.outputWidth = output.width;
+        description.outputHeight = output.height;
+        description.colorTextureFormat = input.pixelFormat;
+        description.outputTextureFormat = output.pixelFormat;
+        description.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeLinear;
+        
+        m_scaler = [description newSpatialScalerWithDevice:metalDevice];
+    }
+    
+    id<MTLCommandBuffer> commandBuffer = m_MetalGraphics->CurrentCommandBuffer();
+    if (commandBuffer == nil) return;
+    
+    m_MetalGraphics->EndCurrentCommandEncoder();
+    m_scaler.colorTexture = input;
+    m_scaler.outputTexture = output;
+    
+    [m_scaler encodeToCommandBuffer:commandBuffer];
+}
 
 #endif // #if SUPPORT_METAL

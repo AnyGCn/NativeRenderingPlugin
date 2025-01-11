@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -12,7 +12,9 @@
 		2B6899BA1CF8396700C4BA4F /* RenderingPlugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899B31CF8396700C4BA4F /* RenderingPlugin.cpp */; };
 		2B6899C91CF83DB000C4BA4F /* RenderingPlugin.bundle in Copy Bundle into Unity project */ = {isa = PBXBuildFile; fileRef = 8D576316048677EA00EA77CD /* RenderingPlugin.bundle */; };
 		2B6899CB1CF8409A00C4BA4F /* RenderAPI_Metal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899CA1CF8409A00C4BA4F /* RenderAPI_Metal.mm */; };
-		2BC2A8D5144C433D00D5EF79 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BC2A8D4144C433D00D5EF79 /* OpenGL.framework */; };
+		87361F3E2CF35ADF00BBA4B3 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */; };
+		874849F92CF30831003425EF /* MetalFX.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 874849F82CF30831003425EF /* MetalFX.framework */; };
+		874849FB2CF355BB003425EF /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 874849FA2CF355BB003425EF /* Metal.framework */; };
 		8D576314048677EA00EA77CD /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0AA1909FFE8422F4C02AAC07 /* CoreFoundation.framework */; };
 /* End PBXBuildFile section */
 
@@ -46,7 +48,9 @@
 		2B6899C61CF839A600C4BA4F /* IUnityGraphicsMetal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityGraphicsMetal.h; path = ../../source/Unity/IUnityGraphicsMetal.h; sourceTree = "<group>"; };
 		2B6899C71CF839A600C4BA4F /* IUnityInterface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityInterface.h; path = ../../source/Unity/IUnityInterface.h; sourceTree = "<group>"; };
 		2B6899CA1CF8409A00C4BA4F /* RenderAPI_Metal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = RenderAPI_Metal.mm; path = ../../source/RenderAPI_Metal.mm; sourceTree = "<group>"; };
-		2BC2A8D4144C433D00D5EF79 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		874849F82CF30831003425EF /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = System/Library/Frameworks/MetalFX.framework; sourceTree = SDKROOT; };
+		874849FA2CF355BB003425EF /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		8D576316048677EA00EA77CD /* RenderingPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RenderingPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D576317048677EA00EA77CD /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -56,8 +60,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				87361F3E2CF35ADF00BBA4B3 /* MetalKit.framework in Frameworks */,
+				874849F92CF30831003425EF /* MetalFX.framework in Frameworks */,
+				874849FB2CF355BB003425EF /* Metal.framework in Frameworks */,
 				8D576314048677EA00EA77CD /* CoreFoundation.framework in Frameworks */,
-				2BC2A8D5144C433D00D5EF79 /* OpenGL.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +77,7 @@
 				089C167CFE841241C02AAC07 /* Resources */,
 				089C1671FE841209C02AAC07 /* External Frameworks and Libraries */,
 				19C28FB6FE9D52B211CA2CBB /* Products */,
+				874849F72CF30831003425EF /* Frameworks */,
 			);
 			name = RenderingPlugin;
 			sourceTree = "<group>";
@@ -79,7 +86,6 @@
 			isa = PBXGroup;
 			children = (
 				0AA1909FFE8422F4C02AAC07 /* CoreFoundation.framework */,
-				2BC2A8D4144C433D00D5EF79 /* OpenGL.framework */,
 			);
 			name = "External Frameworks and Libraries";
 			sourceTree = "<group>";
@@ -129,6 +135,16 @@
 			name = Unity;
 			sourceTree = "<group>";
 		};
+		874849F72CF30831003425EF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */,
+				874849FA2CF355BB003425EF /* Metal.framework */,
+				874849F82CF30831003425EF /* MetalFX.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -157,19 +173,27 @@
 		089C1669FE841209C02AAC07 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0730;
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					8D57630D048677EA00EA77CD = {
+						DevelopmentTeam = NUJL89MU2Y;
+						ProvisioningStyle = Automatic;
+					};
+				};
 			};
 			buildConfigurationList = 1DEB911E08733D790010E9CD /* Build configuration list for PBXProject "RenderingPlugin" */;
-			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
+			developmentRegion = en;
 			hasScannedForEncodings = 1;
 			knownRegions = (
-				English,
-				Japanese,
-				French,
-				German,
+				ja,
+				en,
+				Base,
+				fr,
+				de,
 			);
 			mainGroup = 089C166AFE841209C02AAC07 /* RenderingPlugin */;
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -206,17 +230,22 @@
 		1DEB911B08733D790010E9CD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				ALWAYS_SEARCH_USER_PATHS = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				DEVELOPMENT_TEAM = NUJL89MU2Y;
 				HEADER_SEARCH_PATHS = ../;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Library/Bundles";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.${PRODUCT_NAME:rfc1034Identifier}";
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.anyg.metalfxPlugin;
 				PRODUCT_NAME = RenderingPlugin;
-				VALID_ARCHS = x86_64;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				WRAPPER_EXTENSION = bundle;
 			};
 			name = Debug;
@@ -224,16 +253,21 @@
 		1DEB911C08733D790010E9CD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				ALWAYS_SEARCH_USER_PATHS = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = NUJL89MU2Y;
 				HEADER_SEARCH_PATHS = ../;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Library/Bundles";
-				PRODUCT_BUNDLE_IDENTIFIER = "com.yourcompany.${PRODUCT_NAME:rfc1034Identifier}";
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.anyg.metalfxPlugin;
 				PRODUCT_NAME = RenderingPlugin;
-				VALID_ARCHS = x86_64;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				WRAPPER_EXTENSION = bundle;
 			};
 			name = Release;
@@ -242,8 +276,37 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -255,6 +318,35 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				DEAD_CODE_STRIPPING = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				SDKROOT = macosx;
 				SYMROOT = ../../build;

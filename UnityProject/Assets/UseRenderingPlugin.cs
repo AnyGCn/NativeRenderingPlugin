@@ -207,7 +207,13 @@ public class UseRenderingPlugin : MonoBehaviour
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Direct3D12)
             {
                 GL.IssuePluginEvent(GetRenderEventFunc(), 2);
+                CommandBuffer cmd = new CommandBuffer();
             }
         }
+    }
+
+    private void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        
     }
 }

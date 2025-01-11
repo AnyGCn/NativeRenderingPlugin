@@ -46,7 +46,7 @@ public:
 	virtual void* BeginModifyVertexBuffer(void* bufferHandle, size_t* outBufferSize) = 0;
 	// End modifying vertex buffer data.
 	virtual void EndModifyVertexBuffer(void* bufferHandle) = 0;
-
+    
 	// --------------------------------------------------------------------------
 	// DX12 plugin specific functions
 	// --------------------------------------------------------------------------
@@ -81,6 +81,12 @@ public:
 	virtual unsigned int getSyncInterval() { return 0; }
 	virtual unsigned int getBackbufferWidth() { return 0;  }
 	virtual unsigned int getBackbufferHeight() { return 0; }
+
+    // --------------------------------------------------------------------------
+    // Metal plugin specific functions
+    // --------------------------------------------------------------------------
+    
+    virtual void UpscaleTexture(void* data) {}
 };
 
 
