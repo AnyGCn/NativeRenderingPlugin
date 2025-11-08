@@ -15,3 +15,10 @@ RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType)
 	// Unknown or unsupported graphics API
 	return NULL;
 }
+
+#    if !SUPPORT_METAL
+bool SupportMetalFX
+{
+    return false;
+}
+#    endif

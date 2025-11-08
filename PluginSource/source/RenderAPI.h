@@ -25,11 +25,12 @@ public:
     // --------------------------------------------------------------------------
     
     virtual void UpscaleTextureMetalFXSpatial(void* data) {}
-
 	virtual void UpscaleTextureMetalFXTemporal(void* data) {}
+    virtual void ClearResourceMetalFX(void* data) {}
 };
 
 
 // Create a graphics API implementation instance for the given API type.
 RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType);
 
+bool SupportMetalFX();

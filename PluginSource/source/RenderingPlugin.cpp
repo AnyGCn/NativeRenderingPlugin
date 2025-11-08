@@ -53,11 +53,11 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RegisterPlugin()
 // --------------------------------------------------------------------------
 // GraphicsDeviceEvent
 
-
+const int RenderEventWithDataFuncCount = 3;
 static RenderAPI* s_CurrentAPI = NULL;
 static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
-typedef (RenderAPI::*RenderEventWithDataFunc)(void*);
-RenderEventWithDataFunc s_RenderEventWithDataFunc[2];
+typedef void (RenderAPI::*RenderEventWithDataFunc)(void*);
+RenderEventWithDataFunc s_RenderEventWithDataFunc[RenderEventWithDataFuncCount];
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
 {
@@ -69,6 +69,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 		s_CurrentAPI = CreateRenderAPI(s_DeviceType);
 		s_RenderEventWithDataFunc[0] = &RenderAPI::UpscaleTextureMetalFXSpatial;
 		s_RenderEventWithDataFunc[1] = &RenderAPI::UpscaleTextureMetalFXTemporal;
+        s_RenderEventWithDataFunc[2] = &RenderAPI::ClearResourceMetalFX;
 	}
 
 	// Let the implementation process the device related events
@@ -104,12 +105,12 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID)
 static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void* data)
 {
     // Unknown / unsupported graphics device type? Do nothing
-    if (s_CurrentAPI == NULL || eventID < 0 || eventID > 1)
+    if (s_CurrentAPI == NULL || eventID < 0 || eventID >= RenderEventWithDataFuncCount)
     {
         return;
     }
 
-	s_RenderEventWithDataFunc[eventID](s_CurrentAPI, data);
+    (s_CurrentAPI->*(s_RenderEventWithDataFunc[eventID]))(data);
 }
 
 // --------------------------------------------------------------------------
@@ -123,4 +124,9 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRen
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventWithDataFunc()
 {
     return OnRenderEventWithData;
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetMetalFXSupport()
+{
+    return SupportMetalFX();
 }

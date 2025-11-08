@@ -50,7 +50,7 @@ public class MetalFXTest : MonoBehaviour
         CommandBuffer cmd = new CommandBuffer();
         cmd.name = "MetalFX Upscale";
         RenderingPluginWrapper.UpscaleTexture(cmd, source, temporary);
-        cmd.Blit(temporary, RenderTexture.active);
+        cmd.Blit(temporary, destination);
         Graphics.ExecuteCommandBuffer(cmd);
         cmd.Release();
         RenderTexture.ReleaseTemporary(temporary);
