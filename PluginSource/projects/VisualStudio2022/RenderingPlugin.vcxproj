@@ -30,6 +30,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\gl3w\gl3w.c" />
     <ClCompile Include="..\..\source\RenderAPI.cpp" />
+    <ClCompile Include="..\..\source\RenderAPI_OpenGLCoreES.cpp" />
     <ClCompile Include="..\..\source\RenderingPlugin.cpp" />
   </ItemGroup>
   <ItemGroup>

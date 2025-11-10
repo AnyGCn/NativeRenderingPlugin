@@ -23,14 +23,16 @@ public:
     // --------------------------------------------------------------------------
     // Metal plugin specific functions
     // --------------------------------------------------------------------------
-    
+
+	virtual bool SupportMetalFX() { return false; }
+	virtual bool SupportFrameExtrapolate() { return false; }
+
     virtual void UpscaleTextureMetalFXSpatial(void* data) {}
 	virtual void UpscaleTextureMetalFXTemporal(void* data) {}
     virtual void ClearResourceMetalFX(void* data) {}
+	virtual void FrameExtrapolate(void* data) {}
 };
 
 
 // Create a graphics API implementation instance for the given API type.
 RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType);
-
-bool SupportMetalFX();

@@ -20,8 +20,7 @@ public:
 
 	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
 
-	virtual bool GetUsesReverseZ() { return true; }
-    
+    virtual bool SupportMetalFX();
     virtual void UpscaleTextureMetalFXSpatial(void* data);
     virtual void UpscaleTextureMetalFXTemporal(void* data);
     virtual void ClearResourceMetalFX(void* data);
@@ -191,7 +190,7 @@ void RenderAPI_Metal::ClearResourceMetalFX(void* data)
     m_temporalScaler = nil;
 }
 
-bool SupportMetalFX()
+bool RenderAPI_Metal::SupportMetalFX()
 {
     if (@available(ios 16.0, macOS 13.0, *))
         return true;

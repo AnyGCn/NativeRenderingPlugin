@@ -53,7 +53,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RegisterPlugin()
 // --------------------------------------------------------------------------
 // GraphicsDeviceEvent
 
-const int RenderEventWithDataFuncCount = 3;
+const int RenderEventWithDataFuncCount = 4;
 static RenderAPI* s_CurrentAPI = NULL;
 static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
 typedef void (RenderAPI::*RenderEventWithDataFunc)(void*);
@@ -70,6 +70,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 		s_RenderEventWithDataFunc[0] = &RenderAPI::UpscaleTextureMetalFXSpatial;
 		s_RenderEventWithDataFunc[1] = &RenderAPI::UpscaleTextureMetalFXTemporal;
         s_RenderEventWithDataFunc[2] = &RenderAPI::ClearResourceMetalFX;
+		s_RenderEventWithDataFunc[2] = &RenderAPI::FrameExtrapolate;
 	}
 
 	// Let the implementation process the device related events
@@ -128,5 +129,10 @@ extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetMetalFXSupport()
 {
-    return SupportMetalFX();
+    return s_CurrentAPI->SupportMetalFX();
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetFrameExtrapolateSupport()
+{
+	return s_CurrentAPI->SupportFrameExtrapolate();
 }

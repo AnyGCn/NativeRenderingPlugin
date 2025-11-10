@@ -4,6 +4,14 @@
 
 RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType)
 {
+#	if SUPPORT_OPENGL_UNIFIED
+	if (apiType == kUnityGfxRendererOpenGLCore || apiType == kUnityGfxRendererOpenGLES30)
+	{
+		extern RenderAPI* CreateRenderAPI_OpenGLCoreES(UnityGfxRenderer apiType);
+		return CreateRenderAPI_OpenGLCoreES(apiType);
+	}
+#	endif // if SUPPORT_OPENGL_UNIFIED
+
 #	if SUPPORT_METAL
 	if (apiType == kUnityGfxRendererMetal)
 	{
@@ -15,10 +23,3 @@ RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType)
 	// Unknown or unsupported graphics API
 	return NULL;
 }
-
-#    if !SUPPORT_METAL
-bool SupportMetalFX
-{
-    return false;
-}
-#    endif
