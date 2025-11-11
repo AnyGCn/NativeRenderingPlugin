@@ -3,6 +3,7 @@
 *.VC.opendb
 .vs
 .idea
+build
 
 xcuserdata
 *.xcworkspace
