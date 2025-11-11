@@ -125,6 +125,8 @@ struct UpscaleTextureTemporalData
     void* output;
     float jitterX;
     float jitterY;
+    float motionVectorScaleX;
+    float motionVectorScaleY;
     int reset;
 };
 
@@ -160,8 +162,6 @@ void RenderAPI_Metal::UpscaleTextureMetalFXTemporal(void* data) API_AVAILABLE(io
         description.motionTextureFormat = motion.pixelFormat;
         
         m_temporalScaler = [description newTemporalScalerWithDevice:metalDevice];
-        m_temporalScaler.motionVectorScaleX = input.width;
-        m_temporalScaler.motionVectorScaleY = input.height;
         m_temporalScaler.reset = true;
     }
     else
@@ -180,6 +180,8 @@ void RenderAPI_Metal::UpscaleTextureMetalFXTemporal(void* data) API_AVAILABLE(io
     m_temporalScaler.reset |= upscaleTextureData->reset == 1;
     m_temporalScaler.jitterOffsetX = upscaleTextureData->jitterX;
     m_temporalScaler.jitterOffsetY = upscaleTextureData->jitterY;
+    m_temporalScaler.motionVectorScaleX = upscaleTextureData->motionVectorScaleX;
+    m_temporalScaler.motionVectorScaleY = upscaleTextureData->motionVectorScaleY;
     
     [m_temporalScaler encodeToCommandBuffer:commandBuffer];
 }
