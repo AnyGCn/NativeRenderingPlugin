@@ -76,6 +76,7 @@ struct UpscaleTextureSpatialData
 {
     void* input;
     void* output;
+    int colorMode;
 };
 
 void RenderAPI_Metal::UpscaleTextureMetalFXSpatial(void* data) API_AVAILABLE(ios(16.0), macosx(13.0))
@@ -102,7 +103,7 @@ void RenderAPI_Metal::UpscaleTextureMetalFXSpatial(void* data) API_AVAILABLE(ios
         description.outputHeight = output.height;
         description.colorTextureFormat = input.pixelFormat;
         description.outputTextureFormat = output.pixelFormat;
-        description.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeLinear;
+        description.colorProcessingMode = (MTLFXSpatialScalerColorProcessingMode)upscaleTextureData->colorMode;
         
         m_spatialScaler = [description newSpatialScalerWithDevice:metalDevice];
     }

@@ -2,7 +2,9 @@
 *.vcxproj.user
 *.VC.opendb
 .vs
+.vscode
 .idea
+bin
 build
 
 xcuserdata

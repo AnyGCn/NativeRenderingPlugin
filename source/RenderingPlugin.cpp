@@ -1,11 +1,12 @@
 // Example low level rendering Unity plugin
 
 #include "PlatformBase.h"
-#include "RenderAPI.h"
 
 #include <assert.h>
 #include <math.h>
 #include <vector>
+
+#include "RenderAPI.h"
 
 // --------------------------------------------------------------------------
 // UnitySetInterfaces
@@ -14,6 +15,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 
 static IUnityInterfaces* s_UnityInterfaces = NULL;
 static IUnityGraphics* s_Graphics = NULL;
+IUnityLog* RenderAPI::s_Logger = NULL;
 
 extern "C" void	UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
 {
@@ -53,7 +55,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RegisterPlugin()
 // --------------------------------------------------------------------------
 // GraphicsDeviceEvent
 
-const int RenderEventWithDataFuncCount = 4;
+const int RenderEventWithDataFuncCount = 5;
 static RenderAPI* s_CurrentAPI = NULL;
 static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
 typedef void (RenderAPI::*RenderEventWithDataFunc)(void*);
@@ -70,12 +72,15 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 		s_RenderEventWithDataFunc[0] = &RenderAPI::UpscaleTextureMetalFXSpatial;
 		s_RenderEventWithDataFunc[1] = &RenderAPI::UpscaleTextureMetalFXTemporal;
         s_RenderEventWithDataFunc[2] = &RenderAPI::ClearResourceMetalFX;
-		s_RenderEventWithDataFunc[2] = &RenderAPI::FrameExtrapolate;
+		s_RenderEventWithDataFunc[3] = &RenderAPI::FrameExtrapolate;
+		s_RenderEventWithDataFunc[4] = &RenderAPI::UpscaleTextureDLSS;
 	}
 
 	// Let the implementation process the device related events
 	if (s_CurrentAPI)
 	{
+		if (eventType == kUnityGfxDeviceEventInitialize)
+			RenderAPI::s_Logger = s_UnityInterfaces->Get<IUnityLog>();
 		s_CurrentAPI->ProcessDeviceEvent(eventType, s_UnityInterfaces);
 	}
 
@@ -135,4 +140,9 @@ extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetMetalFXSupport()
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetFrameExtrapolateSupport()
 {
 	return s_CurrentAPI->SupportFrameExtrapolate();
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetDLSSSupport()
+{
+	return s_CurrentAPI->SupportDLSS();
 }

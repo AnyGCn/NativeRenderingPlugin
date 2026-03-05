@@ -1,0 +1,22 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "default",
+            "displayName": "Default Config",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_MODULE_PATH": "${sourceDir}/CMake",
+                "STREAMLINE_FEATURE_DLSS_SR": "ON",
+                "STREAMLINE_FEATURE_DLSS_FG": "ON",
+                "STREAMLINE_FEATURE_REFLEX": "ON"
+            }
+        }
+    ]
+}

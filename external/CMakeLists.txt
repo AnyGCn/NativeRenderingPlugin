@@ -1,0 +1,6 @@
+if (WIN32)
+    if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/streamline)
+        message(FATAL_ERROR "Streamline not found")
+    endif()
+    add_subdirectory(streamline)
+endif()
