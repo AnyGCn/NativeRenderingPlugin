@@ -75,8 +75,8 @@ public:
 
     virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
 private:
-    IUnityGraphicsD3D12v7*         s_d3d12;
-    ID3D12Device* m_Device;
+    IUnityGraphicsD3D12v7*  m_Graphics;
+    ID3D12Device*           m_Device;
 };
 
 RenderAPI* CreateRenderAPI_D3D12()
@@ -100,26 +100,10 @@ void RenderAPI_D3D12::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
 {
     switch (type)
     {
-    case kUnityGfxDeviceEventInitializePre:
-        SLWrapper::Get().Initialize_preDevice(kUnityGfxRendererD3D12);
-        break;
     case kUnityGfxDeviceEventInitialize:
-        s_d3d12 = interfaces->Get<IUnityGraphicsD3D12v7>();
-        m_Device = s_d3d12->GetDevice();
+        m_Graphics = interfaces->Get<IUnityGraphicsD3D12v7>();
+        m_Device = m_Graphics->GetDevice();
         SLWrapper::Get().Initialize(kUnityGfxRendererD3D12, m_Device);
-
-        UnityD3D12PluginEventConfig config_1;
-        config_1.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_DontCare;
-        config_1.flags = kUnityD3D12EventConfigFlag_SyncWorkerThreads | kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState | kUnityD3D12EventConfigFlag_EnsurePreviousFrameSubmission;
-        config_1.ensureActiveRenderTextureIsBound = true;
-        s_d3d12->ConfigureEvent(1, &config_1);
-
-        UnityD3D12PluginEventConfig config_2;
-        config_2.graphicsQueueAccess = kUnityD3D12GraphicsQueueAccess_Allow;
-        config_2.flags = kUnityD3D12EventConfigFlag_SyncWorkerThreads | kUnityD3D12EventConfigFlag_ModifiesCommandBuffersState | kUnityD3D12EventConfigFlag_EnsurePreviousFrameSubmission;
-        config_2.ensureActiveRenderTextureIsBound = false;
-        s_d3d12->ConfigureEvent(2, &config_2);
-
         break;
     case kUnityGfxDeviceEventShutdown:
         SLWrapper::Get().Shutdown();

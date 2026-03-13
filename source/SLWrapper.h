@@ -42,9 +42,7 @@
 // Streamline Features
 #include <sl_dlss.h>
 #include <sl_reflex.h>
-#include <sl_nis.h>
 #include <sl_dlss_g.h>
-#include <sl_deepdvc.h>
 
 #include "Unity/IUnityGraphics.h"
 
@@ -92,28 +90,21 @@ private:
     sl::DLSSOptions m_dlss_consts{};
     DLSSSettings m_dlss_settings{};
 
-    bool m_nis_available = false;
-    sl::NISOptions m_nis_consts{};
-
-    bool m_deepdvc_available = false;
-    sl::DeepDVCOptions m_deepdvc_consts{};
-
     bool m_dlssg_available = false;
     bool m_dlssg_triggerswapchainRecreation = false;
     bool m_dlssg_shoudLoad = false;
     sl::DLSSGOptions m_dlssg_consts{};
     sl::DLSSGState m_dlssg_settings{};
 
-    bool m_latewarp_available = false;
-    bool m_latewarp_triggerswapchainRecreation = false;
-    bool m_latewarp_shouldLoad = false;
-
     bool m_reflex_available = false;
     sl::ReflexOptions m_reflex_consts{};
     bool m_reflex_driverFlashIndicatorEnable = false;
     bool m_pcl_available = false;
 
-    sl::FrameToken *m_currentFrame;
+    uint32_t m_currentSimFrameID = 0;
+    sl::FrameToken *m_currentSimFrame;
+    uint32_t m_currentRenderFrameID = 0;
+    sl::FrameToken *m_currentRenderFrame;
     sl::ViewportHandle m_viewport = {0};
 
     static sl::Resource allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device);
@@ -145,11 +136,9 @@ public:
 
     virtual void SetSLOptions(const bool checkSig, const bool enableLog, const bool useNewSetTagAPI, const bool allowSMSCG);
 
-    bool Initialize_preDevice(UnityGfxRenderer api);
+    bool Initialize_preDevice();
     bool Initialize(UnityGfxRenderer api, void* pDevice);
     void Shutdown();
-    void ProxyToNative(void* proxy, void** native);
-    void NativeToProxy(void* proxy, void** native);
     void QueueGPUWaitOnSyncObjectSet(void* pDevice, void* cmdQType, void* syncObj, uint64_t syncObjVal);
 
     sl::FeatureRequirements GetFeatureRequirements(sl::Feature feature);
@@ -180,19 +169,6 @@ public:
         void* commandList,
         bool validViewportExtent = false,
         sl::Extent backBufferExtent = {});
-    
-    void TagResources_DeepDVC(
-        void* commandList,
-        void* output);
-    
-    void TagResources_Latewarp(
-        void* commandList,
-        void* backbuffer,
-        void* uiColorAlpha,
-        void* noWarpMask,
-        sl::Extent backBufferExtent);
-
-    void UnTagResources_DeepDVC();
 
     void SetDLSSOptions(const sl::DLSSOptions consts);
     bool GetDLSSAvailable() { return m_dlss_available; }
@@ -202,19 +178,6 @@ public:
     void CleanupDLSS(bool wfi);
     bool CleanupDLSSIfNeeded(const RenderSurfaceSettings& renderSize);
 
-    void SetNISOptions(const sl::NISOptions consts);
-    bool GetNISAvailable() { return m_nis_available; }
-    bool GetNISLastEnable() { return m_nis_consts.mode != sl::NISMode::eOff; }
-    void EvaluateNIS(void* commandList);
-    void CleanupNIS(bool wfi);
-
-    void SetDeepDVCOptions(const sl::DeepDVCOptions consts);
-    bool GetDeepDVCAvailable() { return m_deepdvc_available; }
-    bool GetDeepDVCLastEnable() { return m_deepdvc_consts.mode != sl::DeepDVCMode::eOff; }
-    void QueryDeepDVCState(uint64_t& estimatedVRamUsage);
-    void EvaluateDeepDVC(void* commandList);
-    void CleanupDeepDVC();
-
     bool GetReflexAvailable() { return m_reflex_available; }
     bool GetPCLAvailable() const { return m_pcl_available; }
     void SetReflexConsts(const sl::ReflexOptions consts);
@@ -223,8 +186,8 @@ public:
     void ReflexCallback_SimEnd(uint32_t frameID);
     void ReflexCallback_RenderStart(uint32_t frameID);
     void ReflexCallback_RenderEnd(uint32_t frameID);
-    void ReflexCallback_PresentStart(uint32_t frameID);
-    void ReflexCallback_PresentEnd(uint32_t frameID);
+    void ReflexCallback_PresentStart();
+    void ReflexCallback_PresentEnd();
 
     void ReflexTriggerFlash();
     void ReflexTriggerPcPing();
@@ -246,7 +209,6 @@ public:
     void CleanupDLSSG(bool wfi);
     uint64_t GetDLSSGLastFenceValue();
 
-    bool Get_Latewarp_SwapChainRecreation(bool& turn_on) const;
     void SetReflexCameraData(sl::FrameToken& frameToken, const sl::ReflexCameraData& cameraData);
 
     sl::Result SetTag(const sl::ResourceTag* resources, uint32_t numResources, sl::CommandBuffer* cmdBuffer)

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Unity/IUnityGraphics.h"
+#include "Unity/IUnityRenderingExtensions.h"
+#include "Unity/IUnityProfiler.h"
 #include "Unity/IUnityLog.h"
 
 #include <stddef.h>
@@ -39,26 +40,35 @@ public:
 
 	// Process general event like initialization, shutdown, device loss/reset etc.
 	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) = 0;
+	virtual bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query) { return false; }
 
     // --------------------------------------------------------------------------
     // Metal plugin specific functions
     // --------------------------------------------------------------------------
-
-
 	virtual bool SupportMetalFX() { return false; }
     virtual void UpscaleTextureMetalFXSpatial(void* data) {}
 	virtual void UpscaleTextureMetalFXTemporal(void* data) {}
     virtual void ClearResourceMetalFX(void* data) {}
 
+    // --------------------------------------------------------------------------
+    // NVIDIA plugin specific functions
+    // --------------------------------------------------------------------------
 	virtual bool SupportDLSS() { return false; }
 	virtual void UpscaleTextureDLSS(void* data) {}
+	virtual void ReflexCallback_Sleep(uint32_t frameID);
+	virtual void ReflexCallback_SimStart(uint32_t frameID);
+    virtual void ReflexCallback_SimEnd(uint32_t frameID);
+    virtual void ReflexCallback_RenderStart(uint32_t frameID);
+    virtual void ReflexCallback_RenderEnd(uint32_t frameID);
 
 	virtual bool SupportFrameExtrapolate() { return false; }
 	virtual void FrameExtrapolate(void* data) {}
 
 	static IUnityLog* s_Logger;
+	static IUnityProfiler* s_UnityProfiler;
+	static const UnityProfilerMarkerDesc* s_ProfilerPresentMarker;
 };
-
 
 // Create a graphics API implementation instance for the given API type.
 RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType);
+void RenderAPI_OnPluginLoad();

@@ -13,23 +13,21 @@
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
 
-static IUnityInterfaces* s_UnityInterfaces = NULL;
-static IUnityGraphics* s_Graphics = NULL;
-IUnityLog* RenderAPI::s_Logger = NULL;
+static IUnityInterfaces *s_UnityInterfaces = NULL;
+static IUnityGraphics *s_Graphics = NULL;
+IUnityLog *RenderAPI::s_Logger = NULL;
 
-extern "C" void	UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces *unityInterfaces)
 {
 	s_UnityInterfaces = unityInterfaces;
 	s_Graphics = s_UnityInterfaces->Get<IUnityGraphics>();
+	RenderAPI::s_Logger = s_UnityInterfaces->Get<IUnityLog>();
+	RenderAPI::s_UnityProfiler = unityInterfaces->Get<IUnityProfiler>();
 	s_Graphics->RegisterDeviceEventCallback(OnGraphicsDeviceEvent);
-	
-#if SUPPORT_VULKAN
+	RenderAPI::s_UnityProfiler->CreateMarker(&RenderAPI::s_ProfilerPresentMarker, "Swapchain::PresentCustomByGfxPlugin", kUnityProfilerCategoryRender, kUnityProfilerMarkerFlagDefault, 0);
+
 	if (s_Graphics->GetRenderer() == kUnityGfxRendererNull)
-	{
-		extern void RenderAPI_Vulkan_OnPluginLoad(IUnityInterfaces*);
-		RenderAPI_Vulkan_OnPluginLoad(unityInterfaces);
-	}
-#endif // SUPPORT_VULKAN
+		RenderAPI_OnPluginLoad();
 
 	// Run OnGraphicsDeviceEvent(initialize) manually on plugin load
 	OnGraphicsDeviceEvent(kUnityGfxDeviceEventInitialize);
@@ -41,10 +39,10 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginUnload()
 }
 
 #if UNITY_WEBGL
-typedef void	(UNITY_INTERFACE_API * PluginLoadFunc)(IUnityInterfaces* unityInterfaces);
-typedef void	(UNITY_INTERFACE_API * PluginUnloadFunc)();
+typedef void(UNITY_INTERFACE_API *PluginLoadFunc)(IUnityInterfaces *unityInterfaces);
+typedef void(UNITY_INTERFACE_API *PluginUnloadFunc)();
 
-extern "C" void	UnityRegisterRenderingPlugin(PluginLoadFunc loadPlugin, PluginUnloadFunc unloadPlugin);
+extern "C" void UnityRegisterRenderingPlugin(PluginLoadFunc loadPlugin, PluginUnloadFunc unloadPlugin);
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RegisterPlugin()
 {
@@ -56,9 +54,9 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API RegisterPlugin()
 // GraphicsDeviceEvent
 
 const int RenderEventWithDataFuncCount = 5;
-static RenderAPI* s_CurrentAPI = NULL;
+static RenderAPI *s_CurrentAPI = NULL;
 static UnityGfxRenderer s_DeviceType = kUnityGfxRendererNull;
-typedef void (RenderAPI::*RenderEventWithDataFunc)(void*);
+typedef void (RenderAPI::*RenderEventWithDataFunc)(void *);
 RenderEventWithDataFunc s_RenderEventWithDataFunc[RenderEventWithDataFuncCount];
 
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
@@ -71,7 +69,7 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 		s_CurrentAPI = CreateRenderAPI(s_DeviceType);
 		s_RenderEventWithDataFunc[0] = &RenderAPI::UpscaleTextureMetalFXSpatial;
 		s_RenderEventWithDataFunc[1] = &RenderAPI::UpscaleTextureMetalFXTemporal;
-        s_RenderEventWithDataFunc[2] = &RenderAPI::ClearResourceMetalFX;
+		s_RenderEventWithDataFunc[2] = &RenderAPI::ClearResourceMetalFX;
 		s_RenderEventWithDataFunc[3] = &RenderAPI::FrameExtrapolate;
 		s_RenderEventWithDataFunc[4] = &RenderAPI::UpscaleTextureDLSS;
 	}
@@ -79,8 +77,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 	// Let the implementation process the device related events
 	if (s_CurrentAPI)
 	{
-		if (eventType == kUnityGfxDeviceEventInitialize)
-			RenderAPI::s_Logger = s_UnityInterfaces->Get<IUnityLog>();
 		s_CurrentAPI->ProcessDeviceEvent(eventType, s_UnityInterfaces);
 	}
 
@@ -93,7 +89,10 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
 	}
 }
 
-
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityRenderingExtQuery(UnityRenderingExtQueryType query)
+{
+	return s_CurrentAPI ? s_CurrentAPI->ProcessRenderingExtQuery(query) : false;
+}
 
 // --------------------------------------------------------------------------
 // OnRenderEvent
@@ -108,19 +107,43 @@ static void UNITY_INTERFACE_API OnRenderEvent(int eventID)
 		return;
 }
 
-static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void* data)
+static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void *data)
 {
-    // Unknown / unsupported graphics device type? Do nothing
-    if (s_CurrentAPI == NULL || eventID < 0 || eventID >= RenderEventWithDataFuncCount)
-    {
-        return;
-    }
+	// Unknown / unsupported graphics device type? Do nothing
+	if (s_CurrentAPI == NULL || eventID < 0 || eventID >= RenderEventWithDataFuncCount)
+	{
+		return;
+	}
 
-    (s_CurrentAPI->*(s_RenderEventWithDataFunc[eventID]))(data);
+	(s_CurrentAPI->*(s_RenderEventWithDataFunc[eventID]))(data);
 }
 
 // --------------------------------------------------------------------------
-// GetRenderEventFunc, an example function we export which is used to get a rendering event callback function.
+// extern render event function pointer
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEvent_RenderStart()
+{
+	return [](int frameID) { if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_RenderStart(frameID); };
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEvent_RenderEnd()
+{
+	return [](int frameID) { if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_RenderEnd(frameID); };
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEvent_SetConstant()
+{
+	return [](int frameID) { if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_RenderEnd(frameID); };
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEvent_SetTexture()
+{
+
+}
+
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEvent_Sleep()
+{
+	return [](int frameID) { if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_Sleep(frameID); };
+}
 
 extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventFunc()
 {
@@ -129,20 +152,32 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRen
 
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventWithDataFunc()
 {
-    return OnRenderEventWithData;
+	return OnRenderEventWithData;
 }
 
-extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetMetalFXSupport()
+// --------------------------------------------------------------------------
+// extern function
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SimulateBegin(int frameID)
 {
-    return s_CurrentAPI->SupportMetalFX();
+	if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_SimStart(frameID);
 }
 
-extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetFrameExtrapolateSupport()
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SimulateEnd(int frameID)
 {
-	return s_CurrentAPI->SupportFrameExtrapolate();
+	if (s_CurrentAPI != NULL) s_CurrentAPI->ReflexCallback_SimEnd(frameID);
 }
 
-extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetDLSSSupport()
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportMetalFX()
+{
+	return s_CurrentAPI->SupportMetalFX();
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS()
 {
 	return s_CurrentAPI->SupportDLSS();
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS_FG()
+{
+	return s_CurrentAPI->SupportFrameExtrapolate();
 }

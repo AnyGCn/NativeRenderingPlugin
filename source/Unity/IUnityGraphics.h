@@ -37,7 +37,6 @@ typedef enum UnityGfxDeviceEventType
     kUnityGfxDeviceEventShutdown       = 1,
     kUnityGfxDeviceEventBeforeReset    = 2,
     kUnityGfxDeviceEventAfterReset     = 3,
-    kUnityGfxDeviceEventInitializePre  = 4,
 } UnityGfxDeviceEventType;
 
 typedef void (UNITY_INTERFACE_API * IUnityGraphicsDeviceEventCallback)(UnityGfxDeviceEventType eventType);
