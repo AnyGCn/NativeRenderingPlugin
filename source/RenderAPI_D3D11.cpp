@@ -7,25 +7,19 @@
 #include <assert.h>
 #include <d3d11.h>
 
-#include "RenderAPI.h"
+#include "RenderAPI_D3D.h"
 #include "SLWrapper.h"
 #include "Unity/IUnityGraphicsD3D11.h"
 
-
-class RenderAPI_D3D11 : public RenderAPI
+class RenderAPI_D3D11 : public RenderAPI_D3D
 {
 public:
     RenderAPI_D3D11();
+    ~RenderAPI_D3D11() override { }
 
-    virtual ~RenderAPI_D3D11()
-    {
-    }
-
-    virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
-    virtual bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query);
-	virtual bool SupportDLSS();
-	virtual void UpscaleTextureDLSS(void* data);
-
+    void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
+    bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query) override;
+	void UpscaleTextureDLSS() override;
 private:
     IUnityGraphicsD3D11*    m_Graphics;
     ID3D11Device*           m_Device;
@@ -37,7 +31,8 @@ RenderAPI* CreateRenderAPI_D3D11()
 }
 
 RenderAPI_D3D11::RenderAPI_D3D11()
-    : m_Device(NULL)
+    : m_Graphics(nullptr)
+    , m_Device(nullptr)
 {
 }
 
@@ -61,66 +56,11 @@ void RenderAPI_D3D11::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
     }
 }
 
-bool RenderAPI_D3D11::SupportDLSS()
+void RenderAPI_D3D11::UpscaleTextureDLSS()
 {
-    return SLWrapper::Get().GetDLSSAvailable();
-}
-
-void RenderAPI_D3D11::UpscaleTextureDLSS(void* data)
-{
-    UpscaleTextureData* upscaleData = (UpscaleTextureData*)data;
-    SLWrapper::RenderSurfaceSettings renderSurfaceSettings = { upscaleData->inputSizeX, upscaleData->inputSizeY, upscaleData->outputSizeX, upscaleData->outputSizeY };
-    const bool isReset = SLWrapper::Get().CleanupDLSSIfNeeded(renderSurfaceSettings);
-    SLWrapper::Get().SetViewportHandle(sl::ViewportHandle{ upscaleData->viewHandle }, upscaleData->frameID);
-    sl::Constants slConstants;
-    slConstants.cameraPos = { 0.0f, 0.0f, 0.0f };
-    slConstants.cameraUp = { 0.0f, 1.0f, 0.0f };
-    slConstants.cameraFwd = { 0.0f, 0.0f, 1.0f };
-    slConstants.cameraRight = { 1.0f, 0.0f, 0.0f };
-    slConstants.cameraNear = 0.3f;
-    slConstants.cameraFar = 1000.0f;
-    slConstants.cameraFOV = 60.0f * 3.14159265358979323846 / 180.0f;
-    slConstants.cameraAspectRatio = (float)upscaleData->outputSizeX / (float)upscaleData->outputSizeY;
-    slConstants.jitterOffset = { upscaleData->jitterX, upscaleData->jitterY };
-    slConstants.mvecScale = { upscaleData->motionVectorScaleX, upscaleData->motionVectorScaleY };
-    slConstants.depthInverted = sl::eTrue;
-    slConstants.cameraMotionIncluded = sl::eTrue;
-    slConstants.motionVectors3D = sl::eFalse;
-    slConstants.reset = isReset ? sl::eTrue : sl::eFalse;
-
-    SLWrapper::Get().SetSLConsts(renderSurfaceSettings, slConstants);
-    sl::DLSSOptions dlssOptions;
-    SLWrapper::DLSSSettings dlssSettings;
-    dlssOptions.outputWidth = upscaleData->outputSizeX;
-    dlssOptions.outputHeight = upscaleData->outputSizeY;
-    if (isReset)
-    {
-        if (renderSurfaceSettings.renderSizeX == renderSurfaceSettings.outputSizeX && renderSurfaceSettings.renderSizeY == renderSurfaceSettings.outputSizeY)
-        {
-            dlssOptions.mode = sl::DLSSMode::eDLAA;
-            SLWrapper::Get().SetDLSSOptions(dlssOptions);
-            SLWrapper::Get().QueryDLSSOptimalSettings(dlssSettings);
-        }
-        else
-        {
-            for (sl::DLSSMode mode = sl::DLSSMode::eMaxPerformance; mode <= sl::DLSSMode::eUltraQuality; mode = (sl::DLSSMode)((int)mode + 1))
-            {
-                dlssOptions.mode = mode;
-                SLWrapper::Get().SetDLSSOptions(dlssOptions);
-                SLWrapper::Get().QueryDLSSOptimalSettings(dlssSettings);
-                if (dlssSettings.maxRenderSizeX >= renderSurfaceSettings.renderSizeX && dlssSettings.maxRenderSizeY >= renderSurfaceSettings.renderSizeY)
-                {
-                    break;
-                }
-            }
-        }
-    }
-
     ID3D11DeviceContext* context = nullptr;
     m_Device->GetImmediateContext(&context);
-    SLWrapper::Get().TagResources_General(context, upscaleData->inputMotion, upscaleData->inputDepth, upscaleData->output);
-    SLWrapper::Get().TagResources_DLSS_NIS(context, upscaleData->output, upscaleData->inputColor);
-    SLWrapper::Get().EvaluateDLSS(context);
+    RenderAPI_D3D::UpscaleTextureDLSS(context);
     context->Release();
 }
 
@@ -129,9 +69,9 @@ bool RenderAPI_D3D11::ProcessRenderingExtQuery(UnityRenderingExtQueryType query)
     if (query & kUnityRenderingExtQueryOverridePresentFrame)
     {
         RenderAPI::s_UnityProfiler->BeginSample(RenderAPI::s_ProfilerPresentMarker);
-        SLWrapper::Get().Get().ReflexCallback_PresentStart();
+        SLWrapper::Get().ReflexCallback_PresentStart();
         m_Graphics->GetSwapChain()->Present(m_Graphics->GetSyncInterval(), m_Graphics->GetPresentFlags());
-        SLWrapper::Get().Get().ReflexCallback_PresentEnd();
+        SLWrapper::Get().ReflexCallback_PresentEnd();
         RenderAPI::s_UnityProfiler->EndSample(RenderAPI::s_ProfilerPresentMarker);
         return true;
     }

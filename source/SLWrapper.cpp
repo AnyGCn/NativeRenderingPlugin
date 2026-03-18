@@ -306,9 +306,6 @@ bool SLWrapper::Initialize(UnityGfxRenderer api, void* pDevice)
     reflexConst.frameLimitUs = 0;
     SetReflexConsts(reflexConst);
 
-    // Initialize the frame token to avoid exceptionError.
-    const uint32_t frameID = 0;
-    slGetNewFrameToken(m_currentFrame, &frameID);
     return true;
 }
 
@@ -458,7 +455,7 @@ void SLWrapper::Shutdown()
     }
 }
 
-void SLWrapper::SetSLConsts(const RenderSurfaceSettings& renderSize, const sl::Constants& consts)
+void SLWrapper::SetSLConsts(const CameraData& cameraData)
 {
     if (!m_sl_initialised)
     {
@@ -466,8 +463,42 @@ void SLWrapper::SetSLConsts(const RenderSurfaceSettings& renderSize, const sl::C
         return;
     }
 
-    m_size_consts = renderSize;
-    successCheck(slSetConstants(consts, *m_currentFrame, m_viewport), "slSetConstants");
+    /* code */
+    SetViewportHandle(sl::ViewportHandle{ cameraData.viewHandle });
+    
+    // 初始化RenderSurfaceSettings
+    m_renderSizeX = cameraData.inputSize[0];
+    m_renderSizeY = cameraData.inputSize[1];
+    m_outputSizeX = cameraData.outputSize[0];
+    m_outputSizeY = cameraData.outputSize[1];
+    
+    // 初始化sl::Constants
+    sl::Constants slConstants{};
+    slConstants.cameraViewToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.cameraViewToClip);
+    slConstants.clipToCameraView = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToCameraView);
+    slConstants.clipToLensClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToLensClip);
+    slConstants.clipToPrevClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToPrevClip);
+    slConstants.prevClipToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.prevClipToClip);
+    slConstants.jitterOffset = sl::float2{ cameraData.jitterOffset[0], cameraData.jitterOffset[1] };
+    slConstants.mvecScale = sl::float2{ cameraData.mvecScale[0], cameraData.mvecScale[1] };
+    slConstants.cameraPinholeOffset = sl::float2{ cameraData.cameraPinholeOffset[0], cameraData.cameraPinholeOffset[1] };
+    slConstants.cameraPos = sl::float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
+    slConstants.cameraUp = sl::float3{ cameraData.cameraUp[0], cameraData.cameraUp[1], cameraData.cameraUp[2] };
+    slConstants.cameraRight = sl::float3{ cameraData.cameraRight[0], cameraData.cameraRight[1], cameraData.cameraRight[2] };
+    slConstants.cameraFwd = sl::float3{ cameraData.cameraFwd[0], cameraData.cameraFwd[1], cameraData.cameraFwd[2] };
+    slConstants.cameraNear = cameraData.cameraNear;
+    slConstants.cameraFar = cameraData.cameraFar;
+    slConstants.cameraFOV = cameraData.cameraFOV;
+    slConstants.cameraAspectRatio = cameraData.cameraAspectRatio;
+    slConstants.motionVectorsInvalidValue = cameraData.motionVectorsInvalidValue;
+    slConstants.depthInverted = cameraData.depthInverted ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.cameraMotionIncluded = cameraData.cameraMotionIncluded ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.motionVectors3D = cameraData.motionVectors3D ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.reset = cameraData.reset ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.orthographicProjection = cameraData.orthographicProjection ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.motionVectorsDilated = cameraData.motionVectorsDilated ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.motionVectorsJittered = cameraData.motionVectorsJittered ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    successCheck(slSetConstants(slConstants, *m_currentRenderFrame, m_viewport), "slSetConstants");
 }
 
 void SLWrapper::FeatureLoad(sl::Feature feature, const bool turn_on)
@@ -495,13 +526,13 @@ void SLWrapper::SetDLSSOptions(const sl::DLSSOptions consts)
     successCheck(slDLSSSetOptions(m_viewport, m_dlss_consts), "slDLSSSetOptions");
 }
 
-void SLWrapper::QueryDLSSOptimalSettings(DLSSSettings& settings)
+DLSSSettings SLWrapper::QueryDLSSOptimalSettings(const sl::DLSSOptions& consts)
 {
+    DLSSSettings settings{};
     if (!m_sl_initialised || !m_dlss_available)
     {
         log::warning("SL not initialised or DLSS not available.");
-        settings = DLSSSettings{};
-        return;
+        return settings;
     }
 
     sl::DLSSOptimalSettings dlssOptimal = {};
@@ -511,11 +542,11 @@ void SLWrapper::QueryDLSSOptimalSettings(DLSSSettings& settings)
     settings.optimalRenderSizeY = static_cast<int>(dlssOptimal.optimalRenderHeight);
     settings.sharpness = dlssOptimal.optimalSharpness;
 
-    settings.minRenderSizeX = dlssOptimal.renderWidthMin;
-    settings.minRenderSizeY = dlssOptimal.renderHeightMin;
-    settings.maxRenderSizeX = dlssOptimal.renderWidthMax;
-    settings.maxRenderSizeY = dlssOptimal.renderHeightMax;
-    m_dlss_settings = settings;
+    settings.minRenderSizeX = static_cast<int>(dlssOptimal.renderWidthMin);
+    settings.minRenderSizeY = static_cast<int>(dlssOptimal.renderHeightMin);
+    settings.maxRenderSizeX = static_cast<int>(dlssOptimal.renderWidthMax);
+    settings.maxRenderSizeY = static_cast<int>(dlssOptimal.renderHeightMax);
+    return settings;
 }
 
 void SLWrapper::CleanupDLSS(bool wfi)
@@ -544,32 +575,6 @@ void SLWrapper::CleanupDLSS(bool wfi)
     sl::Result status = slFreeResources(sl::kFeatureDLSS, m_viewport);
     // if we've never ran the feature on this viewport, this call may return 'eErrorInvalidParameter'
     assert(status == sl::Result::eOk || status == sl::Result::eErrorInvalidParameter);
-}
-
-bool SLWrapper::CleanupDLSSIfNeeded(const RenderSurfaceSettings& renderSize)
-{
-    if (!m_sl_initialised)
-    {
-        log::warning("SL not initialised.");
-        return false;
-    }
-
-    if (renderSize.outputSizeX != m_size_consts.outputSizeX || renderSize.outputSizeY != m_size_consts.outputSizeY)
-    {
-        CleanupDLSS(true);
-        return true;
-    }
-
-    if (renderSize.renderSizeX < m_dlss_settings.minRenderSizeX || renderSize.renderSizeY < m_dlss_settings.
-        minRenderSizeY ||
-        renderSize.renderSizeX > m_dlss_settings.maxRenderSizeX || renderSize.renderSizeY > m_dlss_settings.
-        maxRenderSizeY)
-    {
-        CleanupDLSS(true);
-        return true;
-    }
-
-    return false;
 }
 
 void SLWrapper::SetDLSSGOptions(const sl::DLSSGOptions consts)
@@ -785,8 +790,8 @@ void SLWrapper::TagResources_General(
         return;
     }
 
-    sl::Extent renderExtent{0, 0, m_size_consts.renderSizeX, m_size_consts.renderSizeY};
-    sl::Extent fullExtent{0, 0, m_size_consts.outputSizeX, m_size_consts.outputSizeY};
+    sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
+    sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
     sl::Resource motionVectorsResource{}, depthResource{}, finalColorHudlessResource{};
 
     GetSLResource(motionVectorsResource, motionVectors);
@@ -815,8 +820,8 @@ void SLWrapper::TagResources_DLSS_NIS(void* commandList, void* Output, void* Inp
         return;
     }
 
-    sl::Extent renderExtent{0, 0, m_size_consts.renderSizeX, m_size_consts.renderSizeY};
-    sl::Extent fullExtent{0, 0, m_size_consts.outputSizeX, m_size_consts.outputSizeY};
+    sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
+    sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
     sl::Resource outputResource{}, inputResource{};
 
     GetSLResource(outputResource, Output);
@@ -855,7 +860,7 @@ void SLWrapper::EvaluateDLSS(void* commandList)
     sl::ViewportHandle view(m_viewport);
     const sl::BaseStructure* inputs[] = {&view};
     successCheck(slDLSSSetOptions(m_viewport, m_dlss_consts), "slDLSSSetOptions");
-    successCheck(slEvaluateFeature(sl::kFeatureDLSS, *m_currentFrame, inputs, _countof(inputs), commandList),
+    successCheck(slEvaluateFeature(sl::kFeatureDLSS, *m_currentRenderFrame, inputs, _countof(inputs), commandList),
                  "slEvaluateFeature_DLSS");
 }
 

@@ -16,64 +16,18 @@
 #include <iostream>
 
 #include "Unity/IUnityGraphicsD3D12.h"
-#include "RenderAPI.h"
+#include "RenderAPI_D3D.h"
 #include "SLWrapper.h"
 
-#define ReturnOnFail(x, hr, OnFailureMsg, onFailureReturnValue) hr = x; if(FAILED(hr)){OutputDebugStringA(OnFailureMsg); return onFailureReturnValue;}
-
-struct Vec3
-{
-    float x;
-    float y;
-    float z;
-};
-
-struct Vec4
-{
-    float x;
-    float y;
-    float z;
-    float w;
-};
-
-struct Vertex
-{
-    Vec3 position;
-    Vec4 color;
-};
-
-static void handle_hr(HRESULT hr, const char* error = "")
-{
-    if (FAILED(hr))
-    {
-        OutputDebugStringA(error);
-        std::cerr << error << "\n";
-        abort();
-    }
-}
-
-struct D3D12MemoryObject
-{
-    ID3D12Resource* resource;
-    void* mapped;
-    D3D12_HEAP_TYPE heapType;
-    D3D12_RESOURCE_FLAGS resourceFlags;
-    UINT64 deviceMemorySize;
-};
-
-struct D3D12DefaultBufferMemoryObject
-{
-    D3D12MemoryObject uploadResource;
-    D3D12MemoryObject defaultResource;
-};
-
-class RenderAPI_D3D12 : public RenderAPI
+class RenderAPI_D3D12 : public RenderAPI_D3D
 {
 public:
     RenderAPI_D3D12();
-    virtual ~RenderAPI_D3D12() override { }
+    ~RenderAPI_D3D12() override { }
 
-    virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
+    void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
+    bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query) override;
+    void UpscaleTextureDLSS() override;
 private:
     IUnityGraphicsD3D12v7*  m_Graphics;
     ID3D12Device*           m_Device;
@@ -87,6 +41,8 @@ RenderAPI* CreateRenderAPI_D3D12()
 const UINT kNodeMask = 0;
 
 RenderAPI_D3D12::RenderAPI_D3D12()
+    : m_Graphics(nullptr)
+    , m_Device(nullptr)
 {
 }
 
@@ -108,9 +64,34 @@ void RenderAPI_D3D12::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
     case kUnityGfxDeviceEventShutdown:
         SLWrapper::Get().Shutdown();
         break;
+    default:
+        break;
     }
 }
 
+void RenderAPI_D3D12::UpscaleTextureDLSS()
+{
+    UnityGraphicsD3D12RecordingState recordingState;
+    if (!m_Graphics->CommandRecordingState(&recordingState))
+        return;
+    
+    RenderAPI_D3D::UpscaleTextureDLSS(recordingState.commandList);
+}
+
+bool RenderAPI_D3D12::ProcessRenderingExtQuery(UnityRenderingExtQueryType query)
+{
+    if (query & kUnityRenderingExtQueryOverridePresentFrame)
+    {
+        RenderAPI::s_UnityProfiler->BeginSample(RenderAPI::s_ProfilerPresentMarker);
+        SLWrapper::Get().ReflexCallback_PresentStart();
+        m_Graphics->GetSwapChain()->Present(m_Graphics->GetSyncInterval(), m_Graphics->GetPresentFlags());
+        SLWrapper::Get().ReflexCallback_PresentEnd();
+        RenderAPI::s_UnityProfiler->EndSample(RenderAPI::s_ProfilerPresentMarker);
+        return true;
+    }
+
+    return false;
+}
 #undef ReturnOnFail
 
 #endif // #if SUPPORT_D3D12

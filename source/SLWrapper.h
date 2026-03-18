@@ -46,6 +46,9 @@
 
 #include "Unity/IUnityGraphics.h"
 
+struct CameraData;
+struct DLSSSettings;
+
 // Set this to a game's specific sdk version
 static constexpr uint64_t SDK_VERSION = sl::kSDKVersion;
 static constexpr int APP_ID = 231313132;
@@ -56,26 +59,6 @@ bool successCheck(sl::Result result, const char* location = nullptr);
 
 class SLWrapper
 {
-public:
-    struct RenderSurfaceSettings
-    {
-        uint32_t renderSizeX;
-        uint32_t renderSizeY;
-        uint32_t outputSizeX;
-        uint32_t outputSizeY;
-    };
-
-    struct DLSSSettings
-    {
-        uint32_t optimalRenderSizeX;
-        uint32_t optimalRenderSizeY;
-        uint32_t minRenderSizeX;
-        uint32_t minRenderSizeY;
-        uint32_t maxRenderSizeX;
-        uint32_t maxRenderSizeY;
-        float sharpness;
-    };
-
 private:
 
     SLWrapper() = default;
@@ -84,11 +67,13 @@ private:
     UnityGfxRenderer m_api = UnityGfxRenderer::kUnityGfxRendererD3D12;
     void* m_Device = nullptr;
 
-    RenderSurfaceSettings m_size_consts{};
+    uint32_t m_renderSizeX = 0;
+    uint32_t m_renderSizeY = 0;
+    uint32_t m_outputSizeX = 0;
+    uint32_t m_outputSizeY = 0;
 
     bool m_dlss_available = false;
     sl::DLSSOptions m_dlss_consts{};
-    DLSSSettings m_dlss_settings{};
 
     bool m_dlssg_available = false;
     bool m_dlssg_triggerswapchainRecreation = false;
@@ -144,14 +129,13 @@ public:
     sl::FeatureRequirements GetFeatureRequirements(sl::Feature feature);
     sl::FeatureVersion GetFeatureVersion(sl::Feature feature);
 
-    void SetViewportHandle(sl::ViewportHandle vpHandle, uint32_t frameID)
+    void SetViewportHandle(sl::ViewportHandle vpHandle)
     {
         m_viewport = vpHandle;
-        successCheck(slGetNewFrameToken(SLWrapper::Get().m_currentFrame, &frameID), "SL_GetFrameToken");
     }
 
     void GetSLResource(sl::Resource& slResource, void* inputTex);
-    void SetSLConsts(const RenderSurfaceSettings& renderSize, const sl::Constants& consts);
+    void SetSLConsts(const CameraData& cameraData);
     void FeatureLoad(sl::Feature feature, const bool turn_on);
 
     void TagResources_General(
@@ -173,10 +157,9 @@ public:
     void SetDLSSOptions(const sl::DLSSOptions consts);
     bool GetDLSSAvailable() { return m_dlss_available; }
     bool GetDLSSLastEnable() { return m_dlss_consts.mode != sl::DLSSMode::eOff; }
-    void QueryDLSSOptimalSettings(DLSSSettings& settings);
+    DLSSSettings QueryDLSSOptimalSettings(const sl::DLSSOptions& consts);
     void EvaluateDLSS(void* commandList);
     void CleanupDLSS(bool wfi);
-    bool CleanupDLSSIfNeeded(const RenderSurfaceSettings& renderSize);
 
     bool GetReflexAvailable() { return m_reflex_available; }
     bool GetPCLAvailable() const { return m_pcl_available; }
@@ -213,7 +196,7 @@ public:
 
     sl::Result SetTag(const sl::ResourceTag* resources, uint32_t numResources, sl::CommandBuffer* cmdBuffer)
     {
-        return m_SLOptions.useNewSetTagAPI ? slSetTagForFrame(*m_currentFrame, m_viewport, resources, numResources, cmdBuffer) : slSetTag(m_viewport, resources, numResources, cmdBuffer);
+        return m_SLOptions.useNewSetTagAPI ? slSetTagForFrame(*m_currentRenderFrame, m_viewport, resources, numResources, cmdBuffer) : slSetTag(m_viewport, resources, numResources, cmdBuffer);
     }
 };
 

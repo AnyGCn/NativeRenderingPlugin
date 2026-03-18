@@ -6,5 +6,19 @@ LIBRARY
 EXPORTS
    UnityPluginLoad
    UnityPluginUnload
-   GetRenderEventFunc
+   UnityRenderingExtQuery
    GetRenderEventWithDataFunc
+   SetCameraData
+   SetDepthTexture
+   SetMotionVectorsTexture
+   SetHUDLessColorTexture
+   SetScalingInputColorTexture
+   SetScalingOutputColorTexture
+   Sync_Sleep
+   Sync_SimulateBegin
+   Sync_SimulateEnd
+   SupportMetalFX
+   SupportDLSS
+   SupportDLSS_FG
+   SetDLSSOptions
+   QueryDLSSOptimalSettings

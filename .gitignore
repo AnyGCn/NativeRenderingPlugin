@@ -4,8 +4,6 @@
 .vs
 .vscode
 .idea
-bin
-build
 
 xcuserdata
 *.xcworkspace
@@ -13,14 +11,9 @@ xcshareddata
 
 WSATestCertificate.pfx*
 
-UnityProject/*.csproj
-UnityProject/*.sln
-UnityProject/Library
-UnityProject/Temp
-UnityProject/UWP
-UnityProject/Logs
-
-PluginSource/build
-PluginSource/projects/Android/libs/*
-PluginSource/projects/Android/obj/*
-PluginSource/source/*.o
+bin
+build
+external/streamline/*
+projects/Android/libs/*
+projects/Android/obj/*
+source/*.o

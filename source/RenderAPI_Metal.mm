@@ -23,7 +23,7 @@ public:
     virtual bool SupportMetalFX();
     virtual void UpscaleTextureMetalFXSpatial(void* data);
     virtual void UpscaleTextureMetalFXTemporal(void* data);
-    virtual void ClearResourceMetalFX(void* data);
+    virtual void CleanupMetalFX(void* data);
 private:
 	void CreateResources();
 
@@ -187,7 +187,7 @@ void RenderAPI_Metal::UpscaleTextureMetalFXTemporal(void* data) API_AVAILABLE(io
     [m_temporalScaler encodeToCommandBuffer:commandBuffer];
 }
 
-void RenderAPI_Metal::ClearResourceMetalFX(void* data)
+void RenderAPI_Metal::CleanupMetalFX(void* data)
 {
     m_spatialScaler = nil;
     m_temporalScaler = nil;

@@ -1,6 +1,6 @@
 if (WIN32)
     if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/streamline)
-        message(FATAL_ERROR "Streamline not found")
+        message(FATAL_ERROR "Streamline not found, you need to downlaod it's binary from https://github.com/NVIDIA/Streamline")
     endif()
     add_subdirectory(streamline)
 endif()
