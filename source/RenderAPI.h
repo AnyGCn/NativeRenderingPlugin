@@ -80,7 +80,7 @@ struct CameraData
 	bool alphaUpscalingEnabled = false;
 };
 
-enum class DLSSMode
+enum DLSSMode
 {
 	eOff,
 	eMaxPerformance,
@@ -147,7 +147,7 @@ public:
 	virtual bool SupportDLSS() { return false; }
 	virtual void CleanupDLSS() {}
 	virtual void SetDLSSOptions(DLSSMode mode) {}
-	virtual DLSSSettings QueryDLSSOptimalSettings(DLSSMode mode) { return DLSSSettings{}; }
+	virtual DLSSSettings QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode) { return DLSSSettings{}; }
 	virtual void UpscaleTextureDLSS() {}
 	virtual void ReflexCallback_Sleep(uint32_t frameID) {}
 	virtual void ReflexCallback_SimStart(uint32_t frameID) {}

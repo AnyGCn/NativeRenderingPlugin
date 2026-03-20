@@ -6,14 +6,14 @@ class RenderAPI_D3D : public RenderAPI
 {
 protected:
     DLSSMode m_dlss_mode = DLSSMode::eOff;
-    void UpscaleTextureDLSS(void *context) const;
+    void UpscaleTextureDLSS(void* context) const;
 
 public:
     ~RenderAPI_D3D() {};
 
     virtual bool SupportDLSS() override;
     virtual void CleanupDLSS() override;
-    virtual DLSSSettings QueryDLSSOptimalSettings(DLSSMode mode) override;
+    virtual DLSSSettings QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode) override;
     virtual void SetDLSSOptions(DLSSMode mode) override { m_dlss_mode = mode; }
     virtual void ReflexCallback_Sleep(uint32_t frameID) override;
 	virtual void ReflexCallback_SimStart(uint32_t frameID) override;

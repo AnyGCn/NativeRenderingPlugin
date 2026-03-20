@@ -224,7 +224,7 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetDLSSOptions(DLSSMo
 	s_CurrentAPI->SetDLSSOptions(mode);
 }
 
-extern "C" DLSSSettings UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API QueryDLSSOptimalSettings(DLSSMode mode)
+extern "C" DLSSSettings UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode)
 {
-	return s_CurrentAPI->QueryDLSSOptimalSettings(mode);
+	return s_CurrentAPI->QueryDLSSOptimalSettings(outputSizeX, outputSizeY, mode);
 }

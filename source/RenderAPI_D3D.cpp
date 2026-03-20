@@ -21,12 +21,12 @@ void RenderAPI_D3D::CleanupDLSS()
     SLWrapper::Get().CleanupDLSS(false);
 }
 
-DLSSSettings RenderAPI_D3D::QueryDLSSOptimalSettings(DLSSMode mode)
+DLSSSettings RenderAPI_D3D::QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode)
 {
     sl::DLSSOptions dlssOptions;
     dlssOptions.mode = static_cast<sl::DLSSMode>(mode);
-    dlssOptions.outputWidth = m_CameraData.outputSize[0];
-    dlssOptions.outputHeight = m_CameraData.outputSize[1];
+    dlssOptions.outputWidth = outputSizeX;
+    dlssOptions.outputHeight = outputSizeY;
     return SLWrapper::Get().QueryDLSSOptimalSettings(dlssOptions);
 }
 
@@ -46,6 +46,13 @@ void RenderAPI_D3D::UpscaleTextureDLSS(void* context) const
 
 void RenderAPI_D3D::ReflexCallback_Sleep(uint32_t frameID)
 {
+    // Cleanup status
+    m_DepthTexture = 0;
+    m_MotionVectorsTexture = 0;
+    m_HUDLessColorTexture = 0;
+    m_ScalingInputColorTexture = 0;
+    m_ScalingOutputColorTexture = 0;
+    m_CameraData = {};
     SLWrapper::Get().ReflexCallback_Sleep(frameID);
 }
 

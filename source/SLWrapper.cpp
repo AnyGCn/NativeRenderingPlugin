@@ -536,7 +536,7 @@ DLSSSettings SLWrapper::QueryDLSSOptimalSettings(const sl::DLSSOptions& consts)
     }
 
     sl::DLSSOptimalSettings dlssOptimal = {};
-    successCheck(slDLSSGetOptimalSettings(m_dlss_consts, dlssOptimal), "slDLSSGetOptimalSettings");
+    successCheck(slDLSSGetOptimalSettings(consts, dlssOptimal), "slDLSSGetOptimalSettings");
 
     settings.optimalRenderSizeX = static_cast<int>(dlssOptimal.optimalRenderWidth);
     settings.optimalRenderSizeY = static_cast<int>(dlssOptimal.optimalRenderHeight);
@@ -804,11 +804,11 @@ void SLWrapper::TagResources_General(
     sl::ResourceTag depthResourceTag = sl::ResourceTag{
         &depthResource, sl::kBufferTypeDepth, sl::ResourceLifecycle::eOnlyValidNow, &renderExtent
     }; // VK render path depth does not last until present
-    sl::ResourceTag finalColorHudlessResourceTag = sl::ResourceTag{
-        &finalColorHudlessResource, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent
-    };
+    //sl::ResourceTag finalColorHudlessResourceTag = sl::ResourceTag{
+    //    &finalColorHudlessResource, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent
+    //};
 
-    sl::ResourceTag inputs[] = {motionVectorsResourceTag, depthResourceTag, finalColorHudlessResourceTag};
+    sl::ResourceTag inputs[] = {motionVectorsResourceTag, depthResourceTag};
     successCheck(SetTag(inputs, _countof(inputs), commandList), "slSetTag_General");
 }
 
