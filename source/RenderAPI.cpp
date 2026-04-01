@@ -1,5 +1,10 @@
 #include "PlatformBase.h"
 #include "RenderAPI.h"
+
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+
 #include "Unity/IUnityGraphics.h"
 
 RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType)
@@ -38,4 +43,54 @@ RenderAPI* CreateRenderAPI(UnityGfxRenderer apiType)
 
 	// Unknown or unsupported graphics API
 	return NULL;
+}
+
+static constexpr size_t g_MessageBufferSize = 4096;
+void RenderAPI::LogInfo(const char* fmt...)
+{
+	char buffer[g_MessageBufferSize];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+
+	UNITY_LOG(RenderAPI::s_Logger, buffer);
+
+	va_end(args);
+}
+
+void RenderAPI::LogWarning(const char* fmt...)
+{
+	char buffer[g_MessageBufferSize];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+
+	UNITY_LOG_WARNING(RenderAPI::s_Logger, buffer);
+
+	va_end(args);
+}
+
+void RenderAPI::LogError(const char* fmt...)
+{
+	char buffer[g_MessageBufferSize];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+
+	UNITY_LOG_ERROR(RenderAPI::s_Logger, buffer);
+
+	va_end(args);
+}
+
+void RenderAPI::LogFatal(const char* fmt...)
+{
+	char buffer[g_MessageBufferSize];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+
+	UNITY_LOG_ERROR(RenderAPI::s_Logger, buffer);
+	abort();
+
+	va_end(args);
 }

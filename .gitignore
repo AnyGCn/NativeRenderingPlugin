@@ -4,6 +4,7 @@
 .vs
 .vscode
 .idea
+*.DS_Store
 
 xcuserdata
 *.xcworkspace

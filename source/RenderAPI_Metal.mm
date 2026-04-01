@@ -12,18 +12,18 @@
 #import <Metal/Metal.h>
 #import <MetalFX/MetalFX.h>
 
-class API_AVAILABLE(macos(13.0)) API_AVAILABLE(macos(13.0)) RenderAPI_Metal : public RenderAPI
+class API_AVAILABLE(ios(16.0), macos(13.0)) RenderAPI_Metal : public RenderAPI
 {
 public:
 	RenderAPI_Metal();
-	virtual ~RenderAPI_Metal() { }
+    ~RenderAPI_Metal() override { }
 
-	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces);
+	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
 
-    virtual bool SupportMetalFX();
-    virtual void UpscaleTextureMetalFXSpatial(void* data);
-    virtual void UpscaleTextureMetalFXTemporal(void* data);
-    virtual void CleanupMetalFX(void* data);
+    virtual bool SupportMetalFX() override;
+    virtual void UpscaleTextureMetalFXSpatial() override;
+    virtual void UpscaleTextureMetalFXTemporal() override;
+    virtual void CleanupMetalFX() override;
 private:
 	void CreateResources();
 
@@ -72,19 +72,10 @@ void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
 	}
 }
 
-struct UpscaleTextureSpatialData
+void RenderAPI_Metal::UpscaleTextureMetalFXSpatial() API_AVAILABLE(ios(16.0), macosx(13.0))
 {
-    void* input;
-    void* output;
-    int colorMode;
-};
-
-void RenderAPI_Metal::UpscaleTextureMetalFXSpatial(void* data) API_AVAILABLE(ios(16.0), macosx(13.0))
-{
-    UpscaleTextureSpatialData* upscaleTextureData = (UpscaleTextureSpatialData*)data;
-    
-    id<MTLTexture> input = (__bridge id<MTLTexture>)upscaleTextureData->input;
-    id<MTLTexture> output = (__bridge id<MTLTexture>)upscaleTextureData->output;
+    id<MTLTexture> input = (__bridge id<MTLTexture>)m_Textures[eScalingInputColor];
+    id<MTLTexture> output = (__bridge id<MTLTexture>)m_Textures[eScalingOutputColor];
     id<MTLDevice> metalDevice = m_MetalGraphics->MetalDevice();
     m_temporalScaler = nil;
 
@@ -103,7 +94,9 @@ void RenderAPI_Metal::UpscaleTextureMetalFXSpatial(void* data) API_AVAILABLE(ios
         description.outputHeight = output.height;
         description.colorTextureFormat = input.pixelFormat;
         description.outputTextureFormat = output.pixelFormat;
-        description.colorProcessingMode = (MTLFXSpatialScalerColorProcessingMode)upscaleTextureData->colorMode;
+        description.colorProcessingMode = m_CameraData.colorBuffersHDR
+            ? MTLFXSpatialScalerColorProcessingModeHDR
+            : MTLFXSpatialScalerColorProcessingModeLinear;
         
         m_spatialScaler = [description newSpatialScalerWithDevice:metalDevice];
     }
@@ -118,27 +111,12 @@ void RenderAPI_Metal::UpscaleTextureMetalFXSpatial(void* data) API_AVAILABLE(ios
     [m_spatialScaler encodeToCommandBuffer:commandBuffer];
 }
 
-struct UpscaleTextureTemporalData
+void RenderAPI_Metal::UpscaleTextureMetalFXTemporal() API_AVAILABLE(ios(16.0), macosx(13.0))
 {
-    void* inputColor;
-    void* inputDepth;
-    void* inputMotion;
-    void* output;
-    float jitterX;
-    float jitterY;
-    float motionVectorScaleX;
-    float motionVectorScaleY;
-    int reset;
-};
-
-void RenderAPI_Metal::UpscaleTextureMetalFXTemporal(void* data) API_AVAILABLE(ios(16.0), macosx(13.0))
-{
-    UpscaleTextureTemporalData* upscaleTextureData = (UpscaleTextureTemporalData*)data;
-    
-    id<MTLTexture> input = (__bridge id<MTLTexture>)upscaleTextureData->inputColor;
-    id<MTLTexture> depth = (__bridge id<MTLTexture>)upscaleTextureData->inputDepth;
-    id<MTLTexture> motion = (__bridge id<MTLTexture>)upscaleTextureData->inputMotion;
-    id<MTLTexture> output = (__bridge id<MTLTexture>)upscaleTextureData->output;
+    id<MTLTexture> input = (__bridge id<MTLTexture>)m_Textures[eScalingInputColor];
+    id<MTLTexture> depth = (__bridge id<MTLTexture>)m_Textures[eDepth];
+    id<MTLTexture> motion = (__bridge id<MTLTexture>)m_Textures[eMotionVectors];
+    id<MTLTexture> output = (__bridge id<MTLTexture>)m_Textures[eScalingOutputColor];
     id<MTLDevice> metalDevice = m_MetalGraphics->MetalDevice();
     m_spatialScaler = nil;
 
@@ -178,16 +156,16 @@ void RenderAPI_Metal::UpscaleTextureMetalFXTemporal(void* data) API_AVAILABLE(io
     m_temporalScaler.depthTexture = depth;
     m_temporalScaler.motionTexture = motion;
     m_temporalScaler.outputTexture = output;
-    m_temporalScaler.reset |= upscaleTextureData->reset == 1;
-    m_temporalScaler.jitterOffsetX = upscaleTextureData->jitterX;
-    m_temporalScaler.jitterOffsetY = upscaleTextureData->jitterY;
-    m_temporalScaler.motionVectorScaleX = upscaleTextureData->motionVectorScaleX;
-    m_temporalScaler.motionVectorScaleY = upscaleTextureData->motionVectorScaleY;
+    m_temporalScaler.reset |= m_CameraData.reset;
+    m_temporalScaler.jitterOffsetX = m_CameraData.jitterOffset[0];
+    m_temporalScaler.jitterOffsetY = m_CameraData.jitterOffset[1];
+    m_temporalScaler.motionVectorScaleX = m_CameraData.mvecScale[0];
+    m_temporalScaler.motionVectorScaleY = m_CameraData.mvecScale[1];
     
     [m_temporalScaler encodeToCommandBuffer:commandBuffer];
 }
 
-void RenderAPI_Metal::CleanupMetalFX(void* data)
+void RenderAPI_Metal::CleanupMetalFX()
 {
     m_spatialScaler = nil;
     m_temporalScaler = nil;

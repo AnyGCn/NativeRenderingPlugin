@@ -48,6 +48,7 @@
 
 struct CameraData;
 struct DLSSSettings;
+class RenderAPI_D3D;
 
 // Set this to a game's specific sdk version
 static constexpr uint64_t SDK_VERSION = sl::kSDKVersion;
@@ -65,6 +66,7 @@ private:
 
     bool m_sl_initialised = false;
     UnityGfxRenderer m_api = UnityGfxRenderer::kUnityGfxRendererD3D12;
+    RenderAPI_D3D* m_renderAPI = nullptr;
     void* m_Device = nullptr;
 
     uint32_t m_renderSizeX = 0;
@@ -95,8 +97,8 @@ private:
     static sl::Resource allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device);
     static void releaseResourceCallback(sl::Resource* resource, void* device);
 
-    void SetDevice(void* pDevice);
-    void UpdateFeatureAvailable(void* pDevice);
+    void SetDevice();
+    void UpdateFeatureAvailable();
 
     sl::FrameToken* m_renderFrame = nullptr;
     sl::FrameToken* m_presentFrame = nullptr;
@@ -119,10 +121,8 @@ public:
     SLWrapper& operator=(const SLWrapper&) = delete;
     SLWrapper& operator=(SLWrapper&&) = delete;
 
-    virtual void SetSLOptions(const bool checkSig, const bool enableLog, const bool useNewSetTagAPI, const bool allowSMSCG);
-
     bool Initialize_preDevice();
-    bool Initialize(UnityGfxRenderer api, void* pDevice);
+    bool Initialize(UnityGfxRenderer api, RenderAPI_D3D* renderApi);
     void Shutdown();
     void QueueGPUWaitOnSyncObjectSet(void* pDevice, void* cmdQType, void* syncObj, uint64_t syncObjVal);
 
@@ -138,21 +138,9 @@ public:
     void SetSLConsts(const CameraData& cameraData);
     void FeatureLoad(sl::Feature feature, const bool turn_on);
 
-    void TagResources_General(
-        void* commandList,
-        void* motionVectors,
-        void* depth,
-        void* finalColorHudless);
-
-    void TagResources_DLSS_NIS(
-        void* commandList,
-        void* output,
-        void* input);
-
-    void TagResources_DLSS_FG(
-        void* commandList,
-        bool validViewportExtent = false,
-        sl::Extent backBufferExtent = {});
+    void TagResources_General(void* commandList, void* motionVectors, void* depth);
+    void TagResources_DLSS_NIS(void* commandList, void* output, void* input);
+    void TagResources_DLSS_FG(void* commandList, void* finalColorHudless);
 
     void SetDLSSOptions(const sl::DLSSOptions consts);
     bool GetDLSSAvailable() { return m_dlss_available; }
@@ -199,4 +187,3 @@ public:
         return m_SLOptions.useNewSetTagAPI ? slSetTagForFrame(*m_currentRenderFrame, m_viewport, resources, numResources, cmdBuffer) : slSetTag(m_viewport, resources, numResources, cmdBuffer);
     }
 };
-

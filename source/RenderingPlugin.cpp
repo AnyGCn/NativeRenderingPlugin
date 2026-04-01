@@ -122,13 +122,15 @@ static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void *data)
 		return;
 	}
 
+	const uint32_t frameID = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(data));
+
 	switch (eventID)
 	{
 	case Sync_RenderStart:
-		s_CurrentAPI->ReflexCallback_RenderStart(reinterpret_cast<uint32_t>(data));
+		s_CurrentAPI->ReflexCallback_RenderStart(frameID);
 		break;
 	case Sync_RenderEnd:
-		s_CurrentAPI->ReflexCallback_RenderEnd(reinterpret_cast<uint32_t>(data));
+		s_CurrentAPI->ReflexCallback_RenderEnd(frameID);
 		break;
 	case Upscale_DLSS:
 		s_CurrentAPI->UpscaleTextureDLSS();
@@ -152,6 +154,12 @@ static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void *data)
 
 // --------------------------------------------------------------------------
 // extern render event function pointer
+extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventFunc()
+{
+    // lambda function
+    return [](int eventID) { OnRenderEventWithData(eventID, nullptr); };
+}
+
 extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRenderEventWithDataFunc()
 {
 	return OnRenderEventWithData;
@@ -161,70 +169,56 @@ extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 // extern function
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetCameraData(void* data)
 {
-	s_CurrentAPI->SetCameraData(data);
+	if (s_CurrentAPI)
+		s_CurrentAPI->SetCameraData(data);
 }
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetDepthTexture(UnityRenderBuffer renderBuffer)
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTexture(int textureType, void* nativeTexture)
 {
-	s_CurrentAPI->SetDepthTexture(renderBuffer);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetMotionVectorsTexture(UnityRenderBuffer renderBuffer)
-{
-	s_CurrentAPI->SetMotionVectorsTexture(renderBuffer);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetHUDLessColorTexture(UnityRenderBuffer renderBuffer)
-{
-	s_CurrentAPI->SetHUDLessColorTexture(renderBuffer);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetScalingInputColorTexture(UnityRenderBuffer renderBuffer)
-{
-	s_CurrentAPI->SetScalingInputColorTexture(renderBuffer);
-}
-
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetScalingOutputColorTexture(UnityRenderBuffer renderBuffer)
-{
-	s_CurrentAPI->SetScalingOutputColorTexture(renderBuffer);
+    if (s_CurrentAPI)
+        s_CurrentAPI->SetTexture((TextureType)textureType, nativeTexture);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_Sleep(int frameID)
 {
-	s_CurrentAPI->ReflexCallback_Sleep(frameID);
+	if (s_CurrentAPI)
+		s_CurrentAPI->ReflexCallback_Sleep(frameID);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_SimulateBegin(int frameID)
 {
-	s_CurrentAPI->ReflexCallback_SimStart(frameID);
+	if (s_CurrentAPI)
+		s_CurrentAPI->ReflexCallback_SimStart(frameID);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_SimulateEnd(int frameID)
 {
-	s_CurrentAPI->ReflexCallback_SimEnd(frameID);
+	if (s_CurrentAPI)
+		s_CurrentAPI->ReflexCallback_SimEnd(frameID);
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportMetalFX()
 {
-	return s_CurrentAPI->SupportMetalFX();
+	return s_CurrentAPI ? s_CurrentAPI->SupportMetalFX() : false;
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS()
 {
-	return s_CurrentAPI->SupportDLSS();
+	return s_CurrentAPI ? s_CurrentAPI->SupportDLSS() : false;
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS_FG()
 {
-	return s_CurrentAPI->SupportFrameExtrapolate();
+	return s_CurrentAPI ? s_CurrentAPI->SupportFrameExtrapolate() : false;
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetDLSSOptions(DLSSMode mode)
 {
-	s_CurrentAPI->SetDLSSOptions(mode);
+	if (s_CurrentAPI)
+		s_CurrentAPI->SetDLSSOptions(mode);
 }
 
 extern "C" DLSSSettings UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode)
 {
-	return s_CurrentAPI->QueryDLSSOptimalSettings(outputSizeX, outputSizeY, mode);
+	return s_CurrentAPI ? s_CurrentAPI->QueryDLSSOptimalSettings(outputSizeX, outputSizeY, mode) : DLSSSettings{};
 }

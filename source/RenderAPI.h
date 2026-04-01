@@ -1,11 +1,11 @@
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "Unity/IUnityRenderingExtensions.h"
 #include "Unity/IUnityProfiler.h"
 #include "Unity/IUnityLog.h"
-
-#include <stddef.h>
-#include <stdint.h>
 
 struct IUnityInterfaces;
 
@@ -16,7 +16,7 @@ struct CameraData
     //! Specifies matrix transformation from the clip space to the camera view space.
     float clipToCameraView[16];
     //! Optional - Specifies matrix transformation describing lens distortion in clip space.
-    float clipToLensClip[16];
+    // float clipToLensClip[16];
     //! Specifies matrix transformation from the current clip to the previous clip space.
     //! clipToPrevClip = clipToView * viewToViewPrev * viewToClipPrev
     //! Sample code can be found in sl_matrix_helpers.h
@@ -30,7 +30,7 @@ struct CameraData
     //! Specifies scale factors used to normalize motion vectors (so the values are in [-1,1] range)
     float mvecScale[2];
     //! Optional - Specifies camera pinhole offset if used.
-    float cameraPinholeOffset[2];
+    // float cameraPinholeOffset[2];
     //! Specifies camera position in world space.
     float cameraPos[3];
     //! Specifies camera up vector in world space.
@@ -47,10 +47,10 @@ struct CameraData
     //! Specifies camera field of view in radians.
     float cameraFOV;
     //! Specifies camera aspect ratio defined as view space width divided by height.
-    float cameraAspectRatio;
+    // float cameraAspectRatio;
     //! Specifies which value represents an invalid (un-initialized) value in the motion vectors buffer
     //! NOTE: This is only required if `cameraMotionIncluded` is set to false and SL needs to compute it.
-    float motionVectorsInvalidValue;
+    // float motionVectorsInvalidValue;
 
 	int viewHandle = 0;
 
@@ -63,17 +63,17 @@ struct CameraData
     //! Specifies if depth values are inverted (value closer to the camera is higher) or not.
     bool depthInverted = true;
     //! Specifies if camera motion is included in the MVec buffer.
-    bool cameraMotionIncluded = true;
+    // bool cameraMotionIncluded = true;
     //! Specifies if motion vectors are 3D or not.
-    bool motionVectors3D = false;
+    // bool motionVectors3D = false;
     //! Specifies if previous frame has no connection to the current one (i.e. motion vectors are invalid)
     bool reset = false;
     //! Specifies if orthographic projection is used or not.
-    bool orthographicProjection = false;
+    // bool orthographicProjection = false;
     //! Specifies if motion vectors are already dilated or not.
-    bool motionVectorsDilated = false;
+    // bool motionVectorsDilated = false;
     //! Specifies if motion vectors are jittered or not.
-    bool motionVectorsJittered = true;
+    // bool motionVectorsJittered = true;
 
 	bool colorBuffersHDR = true;
 
@@ -89,7 +89,17 @@ enum DLSSMode
 	eUltraPerformance,
 	eUltraQuality,
 	eDLAA,
-	eCount,
+	eDLSSModeCount,
+};
+
+enum TextureType
+{
+	eDepth,
+	eMotionVectors,
+	eHUDLessColor,
+	eScalingInputColor,
+	eScalingOutputColor,
+	eTextureTypeCount,
 };
 
 struct DLSSSettings
@@ -111,11 +121,7 @@ struct DLSSSettings
 class RenderAPI
 {
 protected:
-	UnityRenderBuffer m_DepthTexture;
-	UnityRenderBuffer m_MotionVectorsTexture;
-	UnityRenderBuffer m_HUDLessColorTexture;
-	UnityRenderBuffer m_ScalingInputColorTexture;
-	UnityRenderBuffer m_ScalingOutputColorTexture;
+	void* m_Textures[TextureType::eTextureTypeCount];
 	CameraData m_CameraData;
 
 public:
@@ -124,14 +130,10 @@ public:
 	// --------------------------------------------------------------------------
 	// General plugin functions
 	// --------------------------------------------------------------------------
-	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) = 0;
+	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) {};
 	virtual bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query) { return false; }
 	virtual void SetCameraData(void* data) { m_CameraData = *static_cast<CameraData*>(data); }
-	virtual void SetDepthTexture(UnityRenderBuffer renderBuffer) { m_DepthTexture = renderBuffer; }
-	virtual void SetMotionVectorsTexture(UnityRenderBuffer renderBuffer) { m_MotionVectorsTexture = renderBuffer; }
-	virtual void SetHUDLessColorTexture(UnityRenderBuffer renderBuffer) { m_HUDLessColorTexture = renderBuffer; }
-	virtual void SetScalingInputColorTexture(UnityRenderBuffer renderBuffer) { m_ScalingInputColorTexture = renderBuffer; }
-	virtual void SetScalingOutputColorTexture(UnityRenderBuffer renderBuffer) { m_ScalingOutputColorTexture = renderBuffer; }
+	virtual void SetTexture(TextureType type, void* nativeTexture) { m_Textures[type] = nativeTexture; }
 
     // --------------------------------------------------------------------------
     // Metal plugin specific functions
@@ -159,6 +161,10 @@ public:
 	virtual void FrameExtrapolate(void* data) {}
 
 	static IUnityLog* s_Logger;
+	static void LogInfo(const char* fmt...);
+	static void LogWarning(const char* fmt...);
+	static void LogError(const char* fmt...);
+	static void LogFatal(const char* fmt...);
 	static IUnityProfiler* s_UnityProfiler;
 	static const UnityProfilerMarkerDesc* s_ProfilerPresentMarker;
 };

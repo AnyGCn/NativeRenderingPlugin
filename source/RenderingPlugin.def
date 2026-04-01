@@ -7,13 +7,10 @@ EXPORTS
    UnityPluginLoad
    UnityPluginUnload
    UnityRenderingExtQuery
+   GetRenderEventFunc
    GetRenderEventWithDataFunc
    SetCameraData
-   SetDepthTexture
-   SetMotionVectorsTexture
-   SetHUDLessColorTexture
-   SetScalingInputColorTexture
-   SetScalingOutputColorTexture
+   SetTexture
    Sync_Sleep
    Sync_SimulateBegin
    Sync_SimulateEnd

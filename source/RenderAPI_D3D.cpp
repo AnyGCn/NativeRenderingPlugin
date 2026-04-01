@@ -38,20 +38,17 @@ void RenderAPI_D3D::UpscaleTextureDLSS(void* context) const
     dlssOptions.outputHeight = m_CameraData.outputSize[1];
     dlssOptions.alphaUpscalingEnabled = m_CameraData.alphaUpscalingEnabled ? sl::Boolean::eTrue : sl::Boolean::eFalse;
     dlssOptions.colorBuffersHDR = m_CameraData.colorBuffersHDR ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    SLWrapper::Get().SetViewportHandle(m_CameraData.viewHandle);
+    SLWrapper::Get().SetSLConsts(m_CameraData);
     SLWrapper::Get().SetDLSSOptions(dlssOptions);
-    SLWrapper::Get().TagResources_General(context, m_MotionVectorsTexture, m_DepthTexture, m_HUDLessColorTexture);
-    SLWrapper::Get().TagResources_DLSS_NIS(context, m_ScalingOutputColorTexture, m_ScalingInputColorTexture);
+    SLWrapper::Get().TagResources_General(context, m_Textures[eMotionVector], m_Textures[eDepth]);
+    SLWrapper::Get().TagResources_DLSS_NIS(context, m_Textures[eScalingOutput], m_Textures[eScalingInput]);
     SLWrapper::Get().EvaluateDLSS(context);
 }
 
 void RenderAPI_D3D::ReflexCallback_Sleep(uint32_t frameID)
 {
     // Cleanup status
-    m_DepthTexture = 0;
-    m_MotionVectorsTexture = 0;
-    m_HUDLessColorTexture = 0;
-    m_ScalingInputColorTexture = 0;
-    m_ScalingOutputColorTexture = 0;
     m_CameraData = {};
     SLWrapper::Get().ReflexCallback_Sleep(frameID);
 }
@@ -74,12 +71,6 @@ void RenderAPI_D3D::ReflexCallback_RenderStart(uint32_t frameID)
 void RenderAPI_D3D::ReflexCallback_RenderEnd(uint32_t frameID)
 {
     SLWrapper::Get().ReflexCallback_RenderEnd(frameID);
-}
-
-void RenderAPI_D3D::SetCameraData(void* data)
-{
-    RenderAPI::SetCameraData(data);
-    SLWrapper::Get().SetSLConsts(m_CameraData);
 }
 
 #endif

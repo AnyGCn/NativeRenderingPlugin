@@ -28,6 +28,12 @@ public:
     void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
     bool ProcessRenderingExtQuery(UnityRenderingExtQueryType query) override;
     void UpscaleTextureDLSS() override;
+
+    void* GetDevice() override { return m_Device; }
+    sl::AdapterInfo GetAdaptInfo() override;
+    sl::Resource AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device) override;
+    sl::Resource AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device) override;
+    
 private:
     IUnityGraphicsD3D12v7*  m_Graphics;
     ID3D12Device*           m_Device;
@@ -59,7 +65,7 @@ void RenderAPI_D3D12::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
     case kUnityGfxDeviceEventInitialize:
         m_Graphics = interfaces->Get<IUnityGraphicsD3D12v7>();
         m_Device = m_Graphics->GetDevice();
-        SLWrapper::Get().Initialize(kUnityGfxRendererD3D12, m_Device);
+        SLWrapper::Get().Initialize(kUnityGfxRendererD3D12, this);
         break;
     case kUnityGfxDeviceEventShutdown:
         SLWrapper::Get().Shutdown();
@@ -76,6 +82,58 @@ void RenderAPI_D3D12::UpscaleTextureDLSS()
         return;
     
     RenderAPI_D3D::UpscaleTextureDLSS(recordingState.commandList);
+}
+
+sl::AdapterInfo RenderAPI_D3D12::GetAdaptInfo()
+{
+    sl::AdapterInfo adapterInfo;
+    auto a = m_Device->GetAdapterLuid();
+    adapterInfo.deviceLUID = (uint8_t*)&a;
+    adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
+    return adapterInfo;
+}
+
+sl::Resource RenderAPI_D3D12::AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device)
+{
+    sl::Resource res = {};
+    D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
+    D3D12_HEAP_PROPERTIES* heap = (D3D12_HEAP_PROPERTIES*)resDesc->heap;
+    D3D12_RESOURCE_STATES state = (D3D12_RESOURCE_STATES)resDesc->state;
+    ID3D12Device* pd3d12Device = (ID3D12Device*)device;
+    ID3D12Resource* pbuffer;
+    bool success = SUCCEEDED(
+        pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, nullptr, IID_PPV_ARGS(&
+            pbuffer)));
+    if (!success) RenderAPI::LogError("Failed to create buffer in SL allocation callback");
+    res.type = resDesc->type;
+    res.native = pbuffer;
+    return res;
+}
+
+sl::Resource RenderAPI_D3D12::AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device)
+{
+    sl::Resource res = {};
+    D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
+    D3D12_RESOURCE_STATES state = (D3D12_RESOURCE_STATES)resDesc->state;
+    D3D12_HEAP_PROPERTIES* heap = (D3D12_HEAP_PROPERTIES*)resDesc->heap;
+    ID3D12Device* pd3d12Device = (ID3D12Device*)device;
+    ID3D12Resource* ptexture;
+    D3D12_CLEAR_VALUE* pClearValue = nullptr;
+    D3D12_CLEAR_VALUE clearValue;
+    // specify the clear value to avoid D3D warnings on ClearRenderTarget()
+    if (desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)
+    {
+        clearValue.Format = desc->Format;
+        memset(clearValue.Color, 0, sizeof(clearValue.Color));
+        pClearValue = &clearValue;
+    }
+    bool success = SUCCEEDED(
+        pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, pClearValue, IID_PPV_ARGS
+            (&ptexture)));
+    if (!success) RenderAPI::LogError("Failed to create texture in SL allocation callback");
+    res.type = resDesc->type;
+    res.native = ptexture;
+    return res;
 }
 
 bool RenderAPI_D3D12::ProcessRenderingExtQuery(UnityRenderingExtQueryType query)

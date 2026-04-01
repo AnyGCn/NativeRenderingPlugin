@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		2B6899B91CF8396700C4BA4F /* RenderAPI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899B11CF8396700C4BA4F /* RenderAPI.cpp */; };
 		2B6899BA1CF8396700C4BA4F /* RenderingPlugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899B31CF8396700C4BA4F /* RenderingPlugin.cpp */; };
-		2B6899C91CF83DB000C4BA4F /* RenderingPlugin.bundle in Copy Bundle into Unity project */ = {isa = PBXBuildFile; fileRef = 8D576316048677EA00EA77CD /* RenderingPlugin.bundle */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		2B6899CB1CF8409A00C4BA4F /* RenderAPI_Metal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899CA1CF8409A00C4BA4F /* RenderAPI_Metal.mm */; };
 		87361F3E2CF35ADF00BBA4B3 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */; };
 		874849F92CF30831003425EF /* MetalFX.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 874849F82CF30831003425EF /* MetalFX.framework */; };
@@ -17,33 +16,8 @@
 		879EDD512EC3833D0047EB79 /* RenderAPI_Metal.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899CA1CF8409A00C4BA4F /* RenderAPI_Metal.mm */; };
 		879EDD522EC3833D0047EB79 /* RenderAPI.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899B11CF8396700C4BA4F /* RenderAPI.cpp */; };
 		879EDD532EC3833D0047EB79 /* RenderingPlugin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2B6899B31CF8396700C4BA4F /* RenderingPlugin.cpp */; };
-		879EDD552EC3836C0047EB79 /* libRenderingPluginIOS.a in CopyFiles */ = {isa = PBXBuildFile; fileRef = 879EDD472EC3832B0047EB79 /* libRenderingPluginIOS.a */; };
 		8D576314048677EA00EA77CD /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0AA1909FFE8422F4C02AAC07 /* CoreFoundation.framework */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		2B6899C81CF83D6200C4BA4F /* Copy Bundle into Unity project */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = ../../../MacOS;
-			dstSubfolderSpec = 16;
-			files = (
-				2B6899C91CF83DB000C4BA4F /* RenderingPlugin.bundle in Copy Bundle into Unity project */,
-			);
-			name = "Copy Bundle into Unity project";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		879EDD452EC3832B0047EB79 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = ../../../iOS;
-			dstSubfolderSpec = 16;
-			files = (
-				879EDD552EC3836C0047EB79 /* libRenderingPluginIOS.a in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0AA1909FFE8422F4C02AAC07 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = /System/Library/Frameworks/CoreFoundation.framework; sourceTree = "<absolute>"; };
@@ -55,6 +29,7 @@
 		2B6899C61CF839A600C4BA4F /* IUnityGraphicsMetal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityGraphicsMetal.h; path = ../../source/Unity/IUnityGraphicsMetal.h; sourceTree = "<group>"; };
 		2B6899C71CF839A600C4BA4F /* IUnityInterface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityInterface.h; path = ../../source/Unity/IUnityInterface.h; sourceTree = "<group>"; };
 		2B6899CA1CF8409A00C4BA4F /* RenderAPI_Metal.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = RenderAPI_Metal.mm; path = ../../source/RenderAPI_Metal.mm; sourceTree = "<group>"; };
+		871CD3DA2F7A796F00BCA467 /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk/System/Library/Frameworks/MetalFX.framework; sourceTree = DEVELOPER_DIR; };
 		87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		874849F82CF30831003425EF /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = System/Library/Frameworks/MetalFX.framework; sourceTree = SDKROOT; };
 		874849FA2CF355BB003425EF /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
@@ -148,6 +123,7 @@
 		874849F72CF30831003425EF /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				871CD3DA2F7A796F00BCA467 /* MetalFX.framework */,
 				87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */,
 				874849FA2CF355BB003425EF /* Metal.framework */,
 				874849F82CF30831003425EF /* MetalFX.framework */,
@@ -164,7 +140,6 @@
 			buildPhases = (
 				879EDD432EC3832B0047EB79 /* Sources */,
 				879EDD442EC3832B0047EB79 /* Frameworks */,
-				879EDD452EC3832B0047EB79 /* CopyFiles */,
 			);
 			buildRules = (
 			);
@@ -184,7 +159,6 @@
 				8D57630F048677EA00EA77CD /* Resources */,
 				8D576311048677EA00EA77CD /* Sources */,
 				8D576313048677EA00EA77CD /* Frameworks */,
-				2B6899C81CF83D6200C4BA4F /* Copy Bundle into Unity project */,
 			);
 			buildRules = (
 			);
@@ -279,7 +253,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = NUJL89MU2Y;
+				DEVELOPMENT_TEAM = XXXXXXXXXX;
 				HEADER_SEARCH_PATHS = ../;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Library/Bundles";
@@ -303,7 +277,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = NUJL89MU2Y;
+				DEVELOPMENT_TEAM = XXXXXXXXXX;
 				HEADER_SEARCH_PATHS = ../;
 				INFOPLIST_FILE = Info.plist;
 				INSTALL_PATH = "$(HOME)/Library/Bundles";

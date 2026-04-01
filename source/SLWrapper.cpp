@@ -45,64 +45,8 @@
 #include <cstdio>
 #include <climits>
 
-#include "RenderAPI.h"
+#include "RenderAPI_D3D.h"
 #include "PlatformBase.h"
-
-namespace SLWrapperCustom::log
-{
-    static constexpr size_t g_MessageBufferSize = 4096;
-
-    void info(const char* fmt...)
-    {
-        char buffer[g_MessageBufferSize];
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(buffer, std::size(buffer), fmt, args);
-
-        UNITY_LOG(RenderAPI::s_Logger, buffer);
-
-        va_end(args);
-    }
-
-    void warning(const char* fmt...)
-    {
-        char buffer[g_MessageBufferSize];
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(buffer, std::size(buffer), fmt, args);
-
-        UNITY_LOG_WARNING(RenderAPI::s_Logger, buffer);
-
-        va_end(args);
-    }
-
-    void error(const char* fmt...)
-    {
-        char buffer[g_MessageBufferSize];
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(buffer, std::size(buffer), fmt, args);
-
-        UNITY_LOG_ERROR(RenderAPI::s_Logger, buffer);
-
-        va_end(args);
-    }
-
-    void fatal(const char* fmt...)
-    {
-        char buffer[g_MessageBufferSize];
-        va_list args;
-        va_start(args, fmt);
-        vsnprintf(buffer, std::size(buffer), fmt, args);
-
-        UNITY_LOG_ERROR(RenderAPI::s_Logger, buffer);
-        abort();
-
-        va_end(args);
-    }
-}
-
-using namespace SLWrapperCustom;
 
 void logFunctionCallback(sl::LogType type, const char* msg)
 {
@@ -206,15 +150,6 @@ SLWrapper& SLWrapper::Get()
     return instance;
 }
 
-void SLWrapper::SetSLOptions(const bool checkSig, const bool enableLog, const bool useNewSetTagAPI,
-                             const bool allowSMSCG)
-{
-    m_SLOptions.checkSig = checkSig;
-    m_SLOptions.enableLog = enableLog;
-    m_SLOptions.useNewSetTagAPI = useNewSetTagAPI;
-    m_SLOptions.allowSMSCG = allowSMSCG;
-}
-
 bool SLWrapper::Initialize_preDevice()
 {
     if (m_sl_initialised)
@@ -234,16 +169,9 @@ bool SLWrapper::Initialize_preDevice()
     pref.logMessageCallback = &logFunctionCallback;
     pref.logLevel = sl::LogLevel::eDefault;
 #else
-    if (m_SLOptions.enableLog)
-    {
-        pref.showConsole = false;
-        pref.logMessageCallback = &logFunctionCallback;
-        pref.logLevel = sl::LogLevel::eDefault;
-    }
-    else
-    {
-        pref.logLevel = sl::LogLevel::eOff;
-    }
+    pref.showConsole = false;
+    pref.logMessageCallback = &logFunctionCallback;
+    pref.logLevel = sl::LogLevel::eDefault;
 #endif
 
     sl::Feature featuresToLoad[] = {
@@ -257,15 +185,12 @@ bool SLWrapper::Initialize_preDevice()
     pref.numFeaturesToLoad = static_cast<uint32_t>(std::size(featuresToLoad));
     pref.flags = sl::PreferenceFlags::eDisableCLStateTracking;
     // pref.flags |= sl::PreferenceFlags::eUseManualHooking;
-    if (m_SLOptions.useNewSetTagAPI)
-    {
-        pref.flags |= sl::PreferenceFlags::eUseFrameBasedResourceTagging;
-    }
+    pref.flags |= sl::PreferenceFlags::eUseFrameBasedResourceTagging;
 
     auto pathDll = GetSlInterposerDllLocation();
 
     HMODULE interposer = {};
-    if (m_SLOptions.checkSig && sl::security::verifyEmbeddedSignature(pathDll.c_str()))
+    if (sl::security::verifyEmbeddedSignature(pathDll.c_str()))
     {
         interposer = LoadLibraryW(pathDll.c_str());
     }
@@ -276,27 +201,28 @@ bool SLWrapper::Initialize_preDevice()
 
     if (!interposer)
     {
-        log::error("Unable to load Streamline Interposer");
+        RenderAPI::LogError("Unable to load Streamline Interposer");
         return false;
     }
 
     m_sl_initialised = successCheck(slInit(pref, SDK_VERSION), "slInit");
     if (!m_sl_initialised)
     {
-        log::error("Failed to initialse SL.");
+        RenderAPI::LogError("Failed to initialse SL.");
         return false;
     }
 
     return true;
 }
 
-bool SLWrapper::Initialize(UnityGfxRenderer api, void* pDevice)
+bool SLWrapper::Initialize(UnityGfxRenderer api, RenderAPI_D3D* renderApi)
 {
     // If Initialize_preDevice has not been call before manually, call it now
     Initialize_preDevice();
     m_api = api;
-    SetDevice(pDevice);
-    UpdateFeatureAvailable(pDevice);
+    m_renderAPI = renderApi;
+    SetDevice();
+    UpdateFeatureAvailable();
 
     // We set reflex consts to a default config. This can be changed at runtime in the UI.
     auto reflexConst = sl::ReflexOptions{};
@@ -309,49 +235,11 @@ bool SLWrapper::Initialize(UnityGfxRenderer api, void* pDevice)
     return true;
 }
 
-void SLWrapper::QueueGPUWaitOnSyncObjectSet(void* pDevice, void* cmdQType, void* syncObj, uint64_t syncObjVal)
-{
-    if (pDevice == nullptr)
-    {
-        log::fatal("Invalid device!");
-    }
-
-    if (m_api == UnityGfxRenderer::kUnityGfxRendererD3D12)
-    {
-        // device could be recreated during swapchain recreation
-        ID3D12Device* pD3d12Device = static_cast<ID3D12Device*>(pDevice);
-        ID3D12CommandQueue* d3d12Queue = static_cast<ID3D12CommandQueue*>(cmdQType);
-        d3d12Queue->Wait(reinterpret_cast<ID3D12Fence*>(syncObj), syncObjVal);
-    }
-}
-
 sl::FeatureRequirements SLWrapper::GetFeatureRequirements(sl::Feature feature)
 {
     sl::FeatureRequirements req;
     slGetFeatureRequirements(feature, req);
     return req;
-}
-
-// Helper function to log feature requirements details
-void LogFeatureRequirements(const char* featureName, const sl::FeatureRequirements& req)
-{
-    log::info("=== %s Feature Requirements ===", featureName);
-    log::info("Flags: eD3D12Supported=%s, eVulkanSupported=%s, eHardwareSchedulingRequired=%s",
-              (req.flags & sl::FeatureRequirementFlags::eD3D12Supported) ? "true" : "false",
-              (req.flags & sl::FeatureRequirementFlags::eVulkanSupported) ? "true" : "false",
-              (req.flags & sl::FeatureRequirementFlags::eHardwareSchedulingRequired) ? "true" : "false");
-    log::info("maxNumCPUThreads: %u", req.maxNumCPUThreads);
-    log::info("maxNumViewports: %u", req.maxNumViewports);
-    log::info("numRequiredTags: %u", req.numRequiredTags);
-    log::info("OS Version Detected: major=%u, minor=%u, build=%u",
-              req.osVersionDetected.major, req.osVersionDetected.minor, req.osVersionDetected.build);
-    log::info("OS Version Required: major=%u, minor=%u, build=%u",
-              req.osVersionRequired.major, req.osVersionRequired.minor, req.osVersionRequired.build);
-    log::info("Driver Version Detected: major=%u, minor=%u, build=%u",
-              req.driverVersionDetected.major, req.driverVersionDetected.minor, req.driverVersionDetected.build);
-    log::info("Driver Version Required: major=%u, minor=%u, build=%u",
-              req.driverVersionRequired.major, req.driverVersionRequired.minor, req.driverVersionRequired.build);
-    log::info("=====================================");
 }
 
 sl::FeatureVersion SLWrapper::GetFeatureVersion(sl::Feature feature)
@@ -361,77 +249,40 @@ sl::FeatureVersion SLWrapper::GetFeatureVersion(sl::Feature feature)
     return ver;
 }
 
-void SLWrapper::SetDevice(void* device_ptr)
+void SLWrapper::SetDevice()
 {
-#if SUPPORT_D3D11
-    if (m_api == UnityGfxRenderer::kUnityGfxRendererD3D11)
-        successCheck(slSetD3DDevice(device_ptr), "slSetD3DDevice");
-#endif
-
-#if SUPPORT_D3D12
-    if (m_api == UnityGfxRenderer::kUnityGfxRendererD3D12)
-        successCheck(slSetD3DDevice(device_ptr), "slSetD3DDevice");
-#endif
+    successCheck(slSetD3DDevice(m_renderAPI->GetDevice()), "slSetD3DDevice");
 }
 
-void SLWrapper::UpdateFeatureAvailable(void* pDevice)
+void SLWrapper::UpdateFeatureAvailable()
 {
-    sl::AdapterInfo adapterInfo;
-
-#if SUPPORT_D3D11
-    if (m_api == UnityGfxRenderer::kUnityGfxRendererD3D11)
-    {
-        IDXGIDevice* pDxgiDevice;
-        if (SUCCEEDED(((ID3D11Device*)pDevice)->QueryInterface(&pDxgiDevice)))
-        {
-            IDXGIAdapter* pAdapter;
-            if (SUCCEEDED(pDxgiDevice->GetAdapter(&pAdapter)))
-            {
-                DXGI_ADAPTER_DESC desc;
-                pAdapter->GetDesc(&desc);
-                adapterInfo.deviceLUID = (uint8_t*)&desc.AdapterLuid;
-                adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
-            }
-        }
-    }
-#endif
-#if SUPPORT_D3D12
-    if (m_api == UnityGfxRenderer::kUnityGfxRendererD3D12)
-    {
-        auto a = ((ID3D12Device*)pDevice)->GetAdapterLuid();
-        adapterInfo.deviceLUID = (uint8_t*)&a;
-        adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
-    }
-#endif
+    sl::AdapterInfo adapterInfo = m_renderAPI->GetAdaptInfo();
 
     // Check if features are fully functional (2nd call of slIsFeatureSupported onwards)
     sl::FeatureRequirements dlss_requirements;
     slGetFeatureRequirements(sl::kFeatureDLSS, dlss_requirements);
-    LogFeatureRequirements("DLSS", dlss_requirements);
 
     m_dlss_available = slIsFeatureSupported(sl::kFeatureDLSS, adapterInfo) == sl::Result::eOk;
-    if (m_dlss_available) log::info("DLSS is supported on this system.");
-    else log::warning("DLSS is not fully functional on this system.");
+    if (m_dlss_available) RenderAPI::LogInfo("DLSS is supported on this system.");
+    else RenderAPI::LogWarning("DLSS is not fully functional on this system.");
 
     sl::FeatureRequirements dlssg_requirements;
     slGetFeatureRequirements(sl::kFeatureDLSS_G, dlssg_requirements);
-    LogFeatureRequirements("DLSS-G", dlssg_requirements);
 
     m_dlssg_available = slIsFeatureSupported(sl::kFeatureDLSS_G, adapterInfo) == sl::Result::eOk;
-    if (m_dlssg_available) log::info("DLSS-G is supported on this system.");
-    else log::warning("DLSS-G is not fully functional on this system.");
+    if (m_dlssg_available) RenderAPI::LogInfo("DLSS-G is supported on this system.");
+    else RenderAPI::LogWarning("DLSS-G is not fully functional on this system.");
 
     m_pcl_available = successCheck(slIsFeatureSupported(sl::kFeaturePCL, adapterInfo), "slIsFeatureSupported_PCL");
-    if (m_pcl_available) log::info("PCL is supported on this system.");
-    else log::warning("PCL is not fully functional on this system.");
+    if (m_pcl_available) RenderAPI::LogInfo("PCL is supported on this system.");
+    else RenderAPI::LogWarning("PCL is not fully functional on this system.");
 
     sl::FeatureRequirements reflex_requirements;
     slGetFeatureRequirements(sl::kFeatureReflex, reflex_requirements);
-    LogFeatureRequirements("Reflex", reflex_requirements);
 
     m_reflex_available = slIsFeatureSupported(sl::kFeatureReflex, adapterInfo) == sl::Result::eOk;
-    if (m_reflex_available) log::info("Reflex is supported on this system.");
-    else log::warning("Reflex is not fully functional on this system.");
+    if (m_reflex_available) RenderAPI::LogInfo("Reflex is supported on this system.");
+    else RenderAPI::LogWarning("Reflex is not fully functional on this system.");
 }
 
 void SLWrapper::Shutdown()
@@ -459,13 +310,10 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
 {
     if (!m_sl_initialised)
     {
-        log::warning("SL not initialised.");
+        RenderAPI::LogWarning("SL not initialised.");
         return;
     }
 
-    /* code */
-    SetViewportHandle(sl::ViewportHandle{ cameraData.viewHandle });
-    
     // 初始化RenderSurfaceSettings
     m_renderSizeX = cameraData.inputSize[0];
     m_renderSizeY = cameraData.inputSize[1];
@@ -476,12 +324,12 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
     sl::Constants slConstants{};
     slConstants.cameraViewToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.cameraViewToClip);
     slConstants.clipToCameraView = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToCameraView);
-    slConstants.clipToLensClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToLensClip);
+    // slConstants.clipToLensClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToLensClip);
     slConstants.clipToPrevClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToPrevClip);
     slConstants.prevClipToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.prevClipToClip);
     slConstants.jitterOffset = sl::float2{ cameraData.jitterOffset[0], cameraData.jitterOffset[1] };
     slConstants.mvecScale = sl::float2{ cameraData.mvecScale[0], cameraData.mvecScale[1] };
-    slConstants.cameraPinholeOffset = sl::float2{ cameraData.cameraPinholeOffset[0], cameraData.cameraPinholeOffset[1] };
+    // slConstants.cameraPinholeOffset = sl::float2{ cameraData.cameraPinholeOffset[0], cameraData.cameraPinholeOffset[1] };
     slConstants.cameraPos = sl::float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
     slConstants.cameraUp = sl::float3{ cameraData.cameraUp[0], cameraData.cameraUp[1], cameraData.cameraUp[2] };
     slConstants.cameraRight = sl::float3{ cameraData.cameraRight[0], cameraData.cameraRight[1], cameraData.cameraRight[2] };
@@ -489,15 +337,15 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
     slConstants.cameraNear = cameraData.cameraNear;
     slConstants.cameraFar = cameraData.cameraFar;
     slConstants.cameraFOV = cameraData.cameraFOV;
-    slConstants.cameraAspectRatio = cameraData.cameraAspectRatio;
-    slConstants.motionVectorsInvalidValue = cameraData.motionVectorsInvalidValue;
+    slConstants.cameraAspectRatio = 1.0f * cameraData.outputSize[0] / static_cast<float>(cameraData.outputSize[1]);
+    // slConstants.motionVectorsInvalidValue = cameraData.motionVectorsInvalidValue;
     slConstants.depthInverted = cameraData.depthInverted ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    slConstants.cameraMotionIncluded = cameraData.cameraMotionIncluded ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    slConstants.motionVectors3D = cameraData.motionVectors3D ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.cameraMotionIncluded = sl::Boolean::eTrue;
+    slConstants.motionVectors3D = sl::Boolean::eFalse;
     slConstants.reset = cameraData.reset ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    slConstants.orthographicProjection = cameraData.orthographicProjection ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    slConstants.motionVectorsDilated = cameraData.motionVectorsDilated ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    slConstants.motionVectorsJittered = cameraData.motionVectorsJittered ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.orthographicProjection = sl::Boolean::eFalse;
+    slConstants.motionVectorsDilated = sl::Boolean::eFalse;
+    slConstants.motionVectorsJittered = sl::Boolean::eTrue;
     successCheck(slSetConstants(slConstants, *m_currentRenderFrame, m_viewport), "slSetConstants");
 }
 
@@ -518,7 +366,7 @@ void SLWrapper::SetDLSSOptions(const sl::DLSSOptions consts)
 {
     if (!m_sl_initialised || !m_dlss_available)
     {
-        log::warning("SL not initialised or DLSS not available.");
+        RenderAPI::LogWarning("SL not initialised or DLSS not available.");
         return;
     }
 
@@ -531,7 +379,7 @@ DLSSSettings SLWrapper::QueryDLSSOptimalSettings(const sl::DLSSOptions& consts)
     DLSSSettings settings{};
     if (!m_sl_initialised || !m_dlss_available)
     {
-        log::warning("SL not initialised or DLSS not available.");
+        RenderAPI::LogWarning("SL not initialised or DLSS not available.");
         return settings;
     }
 
@@ -553,7 +401,7 @@ void SLWrapper::CleanupDLSS(bool wfi)
 {
     if (!m_sl_initialised)
     {
-        log::warning("SL not initialised.");
+        RenderAPI::LogWarning("SL not initialised.");
         return;
     }
     if (!m_dlss_available)
@@ -563,7 +411,7 @@ void SLWrapper::CleanupDLSS(bool wfi)
 
     if (!m_dlss_available)
     {
-        log::warning("DLSS not available.");
+        RenderAPI::LogWarning("DLSS not available.");
         return;
     }
 
@@ -581,7 +429,7 @@ void SLWrapper::SetDLSSGOptions(const sl::DLSSGOptions consts)
 {
     if (!m_sl_initialised || !m_dlssg_available)
     {
-        log::warning("SL not initialised or DLSSG not available.");
+        RenderAPI::LogWarning("SL not initialised or DLSSG not available.");
         return;
     }
 
@@ -594,7 +442,7 @@ void SLWrapper::QueryDLSSGState(uint64_t& estimatedVRamUsage, int& fps_multiplie
 {
     if (!m_sl_initialised || !m_dlssg_available)
     {
-        log::warning("SL not initialised or DLSSG not available.");
+        RenderAPI::LogWarning("SL not initialised or DLSSG not available.");
         return;
     }
 
@@ -625,13 +473,13 @@ void SLWrapper::CleanupDLSSG(bool wfi)
 {
     if (!m_sl_initialised)
     {
-        log::warning("SL not initialised.");
+        RenderAPI::LogWarning("SL not initialised.");
         return;
     }
 
     if (!m_dlssg_available)
     {
-        log::warning("DLSSG not available.");
+        RenderAPI::LogWarning("DLSSG not available.");
         return;
     }
 
@@ -653,87 +501,17 @@ sl::Resource SLWrapper::allocateResourceCallback(const sl::ResourceAllocationDes
 
     if (device == nullptr)
     {
-        log::warning("No device available for allocation.");
+        RenderAPI::LogWarning("No device available for allocation.");
         return res;
     }
 
-    bool isBuffer = (resDesc->type == sl::ResourceType::eBuffer);
-
-    if (isBuffer)
+    if (resDesc->type == sl::ResourceType::eBuffer)
     {
-#if SUPPORT_D3D11
-
-        if (Get().m_api == UnityGfxRenderer::kUnityGfxRendererD3D11)
-        {
-            D3D11_BUFFER_DESC* desc = (D3D11_BUFFER_DESC*)resDesc->desc;
-            ID3D11Device* pd3d11Device = (ID3D11Device*)device;
-            ID3D11Buffer* pbuffer;
-            bool success = SUCCEEDED(pd3d11Device->CreateBuffer(desc, nullptr, &pbuffer));
-            if (!success) log::error("Failed to create buffer in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = pbuffer;
-        }
-#endif
-
-#if SUPPORT_D3D12
-        if (Get().m_api == UnityGfxRenderer::kUnityGfxRendererD3D12)
-        {
-            D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
-            D3D12_HEAP_PROPERTIES* heap = (D3D12_HEAP_PROPERTIES*)resDesc->heap;
-            D3D12_RESOURCE_STATES state = (D3D12_RESOURCE_STATES)resDesc->state;
-            ID3D12Device* pd3d12Device = (ID3D12Device*)device;
-            ID3D12Resource* pbuffer;
-            bool success = SUCCEEDED(
-                pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, nullptr, IID_PPV_ARGS(&
-                    pbuffer)));
-            if (!success) log::error("Failed to create buffer in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = pbuffer;
-        }
-#endif
+        Get().m_renderAPI->AllocateBuffer(resDesc, device);
     }
-
     else
     {
-#if SUPPORT_D3D11
-
-        if (Get().m_api == UnityGfxRenderer::kUnityGfxRendererD3D11)
-        {
-            D3D11_TEXTURE2D_DESC* desc = (D3D11_TEXTURE2D_DESC*)resDesc->desc;
-            ID3D11Device* pd3d11Device = (ID3D11Device*)device;
-            ID3D11Texture2D* ptexture;
-            bool success = SUCCEEDED(pd3d11Device->CreateTexture2D(desc, nullptr, &ptexture));
-            if (!success) log::error("Failed to create texture in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = ptexture;
-        }
-#endif
-
-#if SUPPORT_D3D12
-        if (Get().m_api == UnityGfxRenderer::kUnityGfxRendererD3D12)
-        {
-            D3D12_RESOURCE_DESC* desc = (D3D12_RESOURCE_DESC*)resDesc->desc;
-            D3D12_RESOURCE_STATES state = (D3D12_RESOURCE_STATES)resDesc->state;
-            D3D12_HEAP_PROPERTIES* heap = (D3D12_HEAP_PROPERTIES*)resDesc->heap;
-            ID3D12Device* pd3d12Device = (ID3D12Device*)device;
-            ID3D12Resource* ptexture;
-            D3D12_CLEAR_VALUE* pClearValue = nullptr;
-            D3D12_CLEAR_VALUE clearValue;
-            // specify the clear value to avoid D3D warnings on ClearRenderTarget()
-            if (desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)
-            {
-                clearValue.Format = desc->Format;
-                memset(clearValue.Color, 0, sizeof(clearValue.Color));
-                pClearValue = &clearValue;
-            }
-            bool success = SUCCEEDED(
-                pd3d12Device->CreateCommittedResource(heap, D3D12_HEAP_FLAG_NONE, desc, state, pClearValue, IID_PPV_ARGS
-                    (&ptexture)));
-            if (!success) log::error("Failed to create texture in SL allocation callback");
-            res.type = resDesc->type;
-            res.native = ptexture;
-        }
-#endif
+        Get().m_renderAPI->AllocateTexture(resDesc, device);
     }
     return res;
 }
@@ -749,65 +527,23 @@ void SLWrapper::releaseResourceCallback(sl::Resource* resource, void* device)
 
 void SLWrapper::GetSLResource(sl::Resource& slResource, void* inputTex)
 {
-    if (inputTex == nullptr)
-    {
-        log::error("GetSLResource: Invalid slResource!");
-        return;
-    }
-
-    switch (m_api)
-    {
-#if SUPPORT_D3D11
-    case UnityGfxRenderer::kUnityGfxRendererD3D11:
-        slResource = sl::Resource{sl::ResourceType::eTex2d, inputTex, 0};
-        break;
-#endif
-
-#if SUPPORT_D3D12
-    case UnityGfxRenderer::kUnityGfxRendererD3D12:
-        // TODO: determine resource state manually
-        slResource = sl::Resource{
-            sl::ResourceType::eTex2d, inputTex, nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON)
-        };
-        break;
-#endif
-
-    default:
-        log::error("Unsupported graphics API.");
-        break;
-    }
+    // TODO: determine resource state manually
+    slResource = sl::Resource{sl::ResourceType::eTex2d, inputTex, nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON)};
 }
 
-void SLWrapper::TagResources_General(
-    void* commandList,
-    void* motionVectors,
-    void* depth,
-    void* finalColorHudless)
+void SLWrapper::TagResources_General(void* commandList, void* motionVectors, void* depth)
 {
     if (!m_sl_initialised)
     {
-        log::warning("Streamline not initialised.");
+        RenderAPI::LogWarning("Streamline not initialised.");
         return;
     }
 
     sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
-    sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
-    sl::Resource motionVectorsResource{}, depthResource{}, finalColorHudlessResource{};
-
-    GetSLResource(motionVectorsResource, motionVectors);
-    GetSLResource(depthResource, depth);
-    GetSLResource(finalColorHudlessResource, finalColorHudless);
-
-    sl::ResourceTag motionVectorsResourceTag = sl::ResourceTag{
-        &motionVectorsResource, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent
-    };
-    sl::ResourceTag depthResourceTag = sl::ResourceTag{
-        &depthResource, sl::kBufferTypeDepth, sl::ResourceLifecycle::eOnlyValidNow, &renderExtent
-    }; // VK render path depth does not last until present
-    //sl::ResourceTag finalColorHudlessResourceTag = sl::ResourceTag{
-    //    &finalColorHudlessResource, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent
-    //};
-
+    sl::Resource depthResource(sl::ResourceType::eTex2d, depth, D3D12_RESOURCE_STATE_COMMON);
+    sl::Resource motionVectorsResource(sl::ResourceType::eTex2d, motionVectors, D3D12_RESOURCE_STATE_COMMON);
+    sl::ResourceTag motionVectorsResourceTag = sl::ResourceTag{&motionVectorsResource, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
+    sl::ResourceTag depthResourceTag = sl::ResourceTag{&depthResource, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
     sl::ResourceTag inputs[] = {motionVectorsResourceTag, depthResourceTag};
     successCheck(SetTag(inputs, _countof(inputs), commandList), "slSetTag_General");
 }
@@ -816,42 +552,35 @@ void SLWrapper::TagResources_DLSS_NIS(void* commandList, void* Output, void* Inp
 {
     if (!m_sl_initialised)
     {
-        log::warning("Streamline not initialised.");
+        RenderAPI::LogWarning("Streamline not initialised.");
         return;
     }
 
     sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
     sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
-    sl::Resource outputResource{}, inputResource{};
-
-    GetSLResource(outputResource, Output);
-    GetSLResource(inputResource, Input);
-
-    sl::ResourceTag inputResourceTag = sl::ResourceTag{
-        &inputResource, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent
-    };
-    sl::ResourceTag outputResourceTag = sl::ResourceTag{
-        &outputResource, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent
-    };
-
+    sl::Resource inputResource(sl::ResourceType::eTex2d, Input, D3D12_RESOURCE_STATE_COMMON);
+    sl::Resource outputResource(sl::ResourceType::eTex2d, Output, D3D12_RESOURCE_STATE_COMMON);
+    sl::ResourceTag inputResourceTag = sl::ResourceTag{&inputResource, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
+    sl::ResourceTag outputResourceTag = sl::ResourceTag{&outputResource, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent};
     sl::ResourceTag inputs[] = {inputResourceTag, outputResourceTag};
     successCheck(SetTag(inputs, _countof(inputs), commandList), "slSetTag_dlss_nis");
 }
 
-void SLWrapper::TagResources_DLSS_FG(void* commandList, bool validViewportExtent, sl::Extent backBufferExtent)
+void SLWrapper::TagResources_DLSS_FG(void* commandList, void* finalColorHudless)
 {
     if (!m_sl_initialised)
     {
-        log::warning("Streamline not initialised.");
+        RenderAPI::LogWarning("Streamline not initialised.");
         return;
     }
 
+    sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
+    sl::Resource hudlessResource(sl::ResourceType::eTex2d, finalColorHudless, D3D12_RESOURCE_STATE_COMMON);
+    sl::ResourceTag hudlessResourceTag = sl::ResourceTag{&hudlessResource, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent};
     // tag backbuffer resource mainly to pass extent data and therefore resource can be nullptr.
     // If the viewport extent is invalid - set extent to null. This informs streamline that full resource extent needs to be used
-    sl::ResourceTag backBufferResourceTag = sl::ResourceTag{
-        nullptr, sl::kBufferTypeBackbuffer, sl::ResourceLifecycle{}, validViewportExtent ? &backBufferExtent : nullptr
-    };
-    sl::ResourceTag inputs[] = {backBufferResourceTag};
+    sl::ResourceTag backBufferResourceTag = sl::ResourceTag{nullptr, sl::kBufferTypeBackbuffer, sl::ResourceLifecycle{}, &fullExtent};
+    sl::ResourceTag inputs[] = {backBufferResourceTag, hudlessResourceTag};
     successCheck(SetTag(inputs, _countof(inputs), commandList), "slSetTag_dlss_fg");
 }
 
@@ -868,7 +597,7 @@ void SLWrapper::SetReflexConsts(const sl::ReflexOptions options)
 {
     if (!m_sl_initialised || !m_reflex_available)
     {
-        log::warning("SL not initialised or Reflex not available.");
+        RenderAPI::LogWarning("SL not initialised or Reflex not available.");
         return;
     }
 

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <sl.h>
+#include <sl_consts.h>
+#include <sl_hooks.h>
+#include <sl_version.h>
+
 #include "RenderAPI.h"
 
 class RenderAPI_D3D : public RenderAPI
@@ -21,5 +26,8 @@ public:
     virtual void ReflexCallback_RenderStart(uint32_t frameID) override;
     virtual void ReflexCallback_RenderEnd(uint32_t frameID) override;
 
-    virtual void SetCameraData(void* data) override;
+    virtual void* GetDevice() = 0;
+    virtual sl::AdapterInfo GetAdaptInfo() = 0;
+    virtual sl::Resource AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device) = 0;
+    virtual sl::Resource AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device) = 0;
 };
