@@ -41,8 +41,8 @@ void RenderAPI_D3D::UpscaleTextureDLSS(void* context) const
     SLWrapper::Get().SetViewportHandle(m_CameraData.viewHandle);
     SLWrapper::Get().SetSLConsts(m_CameraData);
     SLWrapper::Get().SetDLSSOptions(dlssOptions);
-    SLWrapper::Get().TagResources_General(context, m_Textures[eMotionVector], m_Textures[eDepth]);
-    SLWrapper::Get().TagResources_DLSS_NIS(context, m_Textures[eScalingOutput], m_Textures[eScalingInput]);
+    SLWrapper::Get().TagResources_General(context, m_Textures[eMotionVectors], m_Textures[eDepth]);
+    SLWrapper::Get().TagResources_DLSS_NIS(context, m_Textures[eScalingOutputColor], m_Textures[eScalingInputColor]);
     SLWrapper::Get().EvaluateDLSS(context);
 }
 

@@ -14,6 +14,7 @@ EXPORTS
    Sync_Sleep
    Sync_SimulateBegin
    Sync_SimulateEnd
+   IsValid
    SupportMetalFX
    SupportDLSS
    SupportDLSS_FG

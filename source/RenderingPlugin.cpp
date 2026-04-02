@@ -169,56 +169,55 @@ extern "C" UnityRenderingEventAndData UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API
 // extern function
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetCameraData(void* data)
 {
-	if (s_CurrentAPI)
-		s_CurrentAPI->SetCameraData(data);
+	s_CurrentAPI->SetCameraData(data);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTexture(int textureType, void* nativeTexture)
 {
-    if (s_CurrentAPI)
-        s_CurrentAPI->SetTexture((TextureType)textureType, nativeTexture);
+	s_CurrentAPI->SetTexture((TextureType)textureType, nativeTexture);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_Sleep(int frameID)
 {
-	if (s_CurrentAPI)
-		s_CurrentAPI->ReflexCallback_Sleep(frameID);
+	s_CurrentAPI->ReflexCallback_Sleep(frameID);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_SimulateBegin(int frameID)
 {
-	if (s_CurrentAPI)
-		s_CurrentAPI->ReflexCallback_SimStart(frameID);
+	s_CurrentAPI->ReflexCallback_SimStart(frameID);
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API Sync_SimulateEnd(int frameID)
 {
-	if (s_CurrentAPI)
-		s_CurrentAPI->ReflexCallback_SimEnd(frameID);
+	s_CurrentAPI->ReflexCallback_SimEnd(frameID);
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API IsValid()
+{
+	return s_CurrentAPI != nullptr;
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportMetalFX()
 {
-	return s_CurrentAPI ? s_CurrentAPI->SupportMetalFX() : false;
+	return s_CurrentAPI->SupportMetalFX();
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS()
 {
-	return s_CurrentAPI ? s_CurrentAPI->SupportDLSS() : false;
+	return s_CurrentAPI->SupportDLSS();
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS_FG()
 {
-	return s_CurrentAPI ? s_CurrentAPI->SupportFrameExtrapolate() : false;
+	return s_CurrentAPI->SupportFrameExtrapolate();
 }
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetDLSSOptions(DLSSMode mode)
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetDLSSOptions(int mode)
 {
-	if (s_CurrentAPI)
-		s_CurrentAPI->SetDLSSOptions(mode);
+	s_CurrentAPI->SetDLSSOptions((DLSSMode)mode);
 }
 
 extern "C" DLSSSettings UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API QueryDLSSOptimalSettings(int outputSizeX, int outputSizeY, DLSSMode mode)
 {
-	return s_CurrentAPI ? s_CurrentAPI->QueryDLSSOptimalSettings(outputSizeX, outputSizeY, mode) : DLSSSettings{};
+	return s_CurrentAPI->QueryDLSSOptimalSettings(outputSizeX, outputSizeY, mode);
 }
