@@ -222,7 +222,6 @@ bool SLWrapper::Initialize(UnityGfxRenderer api, RenderAPI_D3D* renderApi)
     m_api = api;
     m_renderAPI = renderApi;
     SetDevice();
-    UpdateFeatureAvailable();
 
     // We set reflex consts to a default config. This can be changed at runtime in the UI.
     auto reflexConst = sl::ReflexOptions{};
@@ -231,6 +230,9 @@ bool SLWrapper::Initialize(UnityGfxRenderer api, RenderAPI_D3D* renderApi)
     reflexConst.virtualKey = VK_F13;
     reflexConst.frameLimitUs = 0;
     SetReflexConsts(reflexConst);
+    UpdateFeatureAvailable();
+    slGetNewFrameToken(m_currentSimFrame, &m_currentSimFrameID);
+    slGetNewFrameToken(m_currentRenderFrame, &m_currentRenderFrameID);
 
     return true;
 }
@@ -256,7 +258,10 @@ void SLWrapper::SetDevice()
 
 void SLWrapper::UpdateFeatureAvailable()
 {
-    sl::AdapterInfo adapterInfo = m_renderAPI->GetAdaptInfo();
+    LUID luid = m_renderAPI->GetAdapterLuid();
+    sl::AdapterInfo adapterInfo;
+    adapterInfo.deviceLUID = (uint8_t*)&luid;
+    adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
 
     // Check if features are fully functional (2nd call of slIsFeatureSupported onwards)
     sl::FeatureRequirements dlss_requirements;
@@ -324,12 +329,12 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
     sl::Constants slConstants{};
     slConstants.cameraViewToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.cameraViewToClip);
     slConstants.clipToCameraView = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToCameraView);
-    // slConstants.clipToLensClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToLensClip);
+    slConstants.clipToLensClip = sl::float4x4{};
     slConstants.clipToPrevClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToPrevClip);
     slConstants.prevClipToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.prevClipToClip);
     slConstants.jitterOffset = sl::float2{ cameraData.jitterOffset[0], cameraData.jitterOffset[1] };
     slConstants.mvecScale = sl::float2{ cameraData.mvecScale[0], cameraData.mvecScale[1] };
-    // slConstants.cameraPinholeOffset = sl::float2{ cameraData.cameraPinholeOffset[0], cameraData.cameraPinholeOffset[1] };
+    slConstants.cameraPinholeOffset = sl::float2{ 0, 0 };
     slConstants.cameraPos = sl::float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
     slConstants.cameraUp = sl::float3{ cameraData.cameraUp[0], cameraData.cameraUp[1], cameraData.cameraUp[2] };
     slConstants.cameraRight = sl::float3{ cameraData.cameraRight[0], cameraData.cameraRight[1], cameraData.cameraRight[2] };
@@ -338,15 +343,15 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
     slConstants.cameraFar = cameraData.cameraFar;
     slConstants.cameraFOV = cameraData.cameraFOV;
     slConstants.cameraAspectRatio = 1.0f * cameraData.outputSize[0] / static_cast<float>(cameraData.outputSize[1]);
-    // slConstants.motionVectorsInvalidValue = cameraData.motionVectorsInvalidValue;
+    slConstants.motionVectorsInvalidValue = 0.0f;
     slConstants.depthInverted = cameraData.depthInverted ? sl::Boolean::eTrue : sl::Boolean::eFalse;
     slConstants.cameraMotionIncluded = sl::Boolean::eTrue;
     slConstants.motionVectors3D = sl::Boolean::eFalse;
     slConstants.reset = cameraData.reset ? sl::Boolean::eTrue : sl::Boolean::eFalse;
     slConstants.orthographicProjection = sl::Boolean::eFalse;
     slConstants.motionVectorsDilated = sl::Boolean::eFalse;
-    slConstants.motionVectorsJittered = sl::Boolean::eTrue;
-    successCheck(slSetConstants(slConstants, *m_currentRenderFrame, m_viewport), "slSetConstants");
+    slConstants.motionVectorsJittered = sl::Boolean::eFalse;
+    successCheck(slSetConstants(slConstants, *m_currentSimFrame, m_viewport), "slSetConstants");
 }
 
 void SLWrapper::FeatureLoad(sl::Feature feature, const bool turn_on)
@@ -497,23 +502,16 @@ void SLWrapper::CleanupDLSSG(bool wfi)
 
 sl::Resource SLWrapper::allocateResourceCallback(const sl::ResourceAllocationDesc* resDesc, void* device)
 {
-    sl::Resource res = {};
-
-    if (device == nullptr)
-    {
-        RenderAPI::LogWarning("No device available for allocation.");
-        return res;
-    }
-
     if (resDesc->type == sl::ResourceType::eBuffer)
     {
-        Get().m_renderAPI->AllocateBuffer(resDesc, device);
+        return Get().m_renderAPI->AllocateBuffer(resDesc, device);
     }
     else
     {
-        Get().m_renderAPI->AllocateTexture(resDesc, device);
+        return Get().m_renderAPI->AllocateTexture(resDesc, device);
     }
-    return res;
+
+    return {};
 }
 
 void SLWrapper::releaseResourceCallback(sl::Resource* resource, void* device)

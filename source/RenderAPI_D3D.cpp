@@ -49,7 +49,6 @@ void RenderAPI_D3D::UpscaleTextureDLSS(void* context) const
 void RenderAPI_D3D::ReflexCallback_Sleep(uint32_t frameID)
 {
     // Cleanup status
-    m_CameraData = {};
     SLWrapper::Get().ReflexCallback_Sleep(frameID);
 }
 

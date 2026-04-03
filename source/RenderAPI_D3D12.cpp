@@ -30,7 +30,7 @@ public:
     void UpscaleTextureDLSS() override;
 
     void* GetDevice() override { return m_Device; }
-    sl::AdapterInfo GetAdaptInfo() override;
+    virtual LUID GetAdapterLuid() override;
     sl::Resource AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device) override;
     sl::Resource AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device) override;
     
@@ -84,13 +84,9 @@ void RenderAPI_D3D12::UpscaleTextureDLSS()
     RenderAPI_D3D::UpscaleTextureDLSS(recordingState.commandList);
 }
 
-sl::AdapterInfo RenderAPI_D3D12::GetAdaptInfo()
+LUID RenderAPI_D3D12::GetAdapterLuid()
 {
-    sl::AdapterInfo adapterInfo;
-    auto a = m_Device->GetAdapterLuid();
-    adapterInfo.deviceLUID = (uint8_t*)&a;
-    adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
-    return adapterInfo;
+    return m_Device->GetAdapterLuid();
 }
 
 sl::Resource RenderAPI_D3D12::AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device)

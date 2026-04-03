@@ -22,7 +22,7 @@ public:
 	void UpscaleTextureDLSS() override;
 
     virtual void* GetDevice() override { return m_Device; }
-    virtual sl::AdapterInfo GetAdaptInfo() override;
+    virtual LUID GetAdapterLuid() override;
     sl::Resource AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device) override;
     sl::Resource AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device) override;
 private:
@@ -69,9 +69,8 @@ void RenderAPI_D3D11::UpscaleTextureDLSS()
     context->Release();
 }
 
-sl::AdapterInfo RenderAPI_D3D11::GetAdaptInfo()
+LUID RenderAPI_D3D11::GetAdapterLuid()
 {
-    sl::AdapterInfo adapterInfo;
     IDXGIDevice* pDxgiDevice;
     if (SUCCEEDED((m_Device)->QueryInterface(&pDxgiDevice)))
     {
@@ -80,12 +79,11 @@ sl::AdapterInfo RenderAPI_D3D11::GetAdaptInfo()
         {
             DXGI_ADAPTER_DESC desc;
             pAdapter->GetDesc(&desc);
-            adapterInfo.deviceLUID = (uint8_t*)&desc.AdapterLuid;
-            adapterInfo.deviceLUIDSizeInBytes = sizeof(LUID);
+            return desc.AdapterLuid;
         }
     }
 
-    return adapterInfo;
+    return {};
 }
 
 sl::Resource RenderAPI_D3D11::AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device)

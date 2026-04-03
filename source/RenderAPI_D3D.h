@@ -4,6 +4,7 @@
 #include <sl_consts.h>
 #include <sl_hooks.h>
 #include <sl_version.h>
+#include <dxgi.h>
 
 #include "RenderAPI.h"
 
@@ -27,7 +28,7 @@ public:
     virtual void ReflexCallback_RenderEnd(uint32_t frameID) override;
 
     virtual void* GetDevice() = 0;
-    virtual sl::AdapterInfo GetAdaptInfo() = 0;
+    virtual LUID GetAdapterLuid() = 0;
     virtual sl::Resource AllocateBuffer(const sl::ResourceAllocationDesc* resDesc, void* device) = 0;
     virtual sl::Resource AllocateTexture(const sl::ResourceAllocationDesc* resDesc, void* device) = 0;
 };
