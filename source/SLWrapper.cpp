@@ -411,11 +411,6 @@ void SLWrapper::CleanupDLSS(bool wfi)
     }
     if (!m_dlss_available)
     {
-        return;
-    }
-
-    if (!m_dlss_available)
-    {
         RenderAPI::LogWarning("DLSS not available.");
         return;
     }
@@ -538,8 +533,8 @@ void SLWrapper::TagResources_General(void* commandList, void* motionVectors, voi
     }
 
     sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
-    sl::Resource depthResource(sl::ResourceType::eTex2d, depth, D3D12_RESOURCE_STATE_COMMON);
-    sl::Resource motionVectorsResource(sl::ResourceType::eTex2d, motionVectors, D3D12_RESOURCE_STATE_COMMON);
+    sl::Resource depthResource(sl::ResourceType::eTex2d, depth, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+    sl::Resource motionVectorsResource(sl::ResourceType::eTex2d, motionVectors, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
     sl::ResourceTag motionVectorsResourceTag = sl::ResourceTag{&motionVectorsResource, sl::kBufferTypeMotionVectors, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
     sl::ResourceTag depthResourceTag = sl::ResourceTag{&depthResource, sl::kBufferTypeDepth, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
     sl::ResourceTag inputs[] = {motionVectorsResourceTag, depthResourceTag};
@@ -556,8 +551,8 @@ void SLWrapper::TagResources_DLSS_NIS(void* commandList, void* Output, void* Inp
 
     sl::Extent renderExtent{0, 0, m_renderSizeX, m_renderSizeY};
     sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
-    sl::Resource inputResource(sl::ResourceType::eTex2d, Input, D3D12_RESOURCE_STATE_COMMON);
-    sl::Resource outputResource(sl::ResourceType::eTex2d, Output, D3D12_RESOURCE_STATE_COMMON);
+    sl::Resource inputResource(sl::ResourceType::eTex2d, Input, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+    sl::Resource outputResource(sl::ResourceType::eTex2d, Output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     sl::ResourceTag inputResourceTag = sl::ResourceTag{&inputResource, sl::kBufferTypeScalingInputColor, sl::ResourceLifecycle::eValidUntilPresent, &renderExtent};
     sl::ResourceTag outputResourceTag = sl::ResourceTag{&outputResource, sl::kBufferTypeScalingOutputColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent};
     sl::ResourceTag inputs[] = {inputResourceTag, outputResourceTag};
@@ -573,7 +568,7 @@ void SLWrapper::TagResources_DLSS_FG(void* commandList, void* finalColorHudless)
     }
 
     sl::Extent fullExtent{0, 0, m_outputSizeX, m_outputSizeY};
-    sl::Resource hudlessResource(sl::ResourceType::eTex2d, finalColorHudless, D3D12_RESOURCE_STATE_COMMON);
+    sl::Resource hudlessResource(sl::ResourceType::eTex2d, finalColorHudless, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
     sl::ResourceTag hudlessResourceTag = sl::ResourceTag{&hudlessResource, sl::kBufferTypeHUDLessColor, sl::ResourceLifecycle::eValidUntilPresent, &fullExtent};
     // tag backbuffer resource mainly to pass extent data and therefore resource can be nullptr.
     // If the viewport extent is invalid - set extent to null. This informs streamline that full resource extent needs to be used

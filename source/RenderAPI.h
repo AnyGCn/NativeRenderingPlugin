@@ -102,6 +102,20 @@ enum TextureType
 	eTextureTypeCount,
 };
 
+// Plugin event IDs passed to IssuePluginEvent / IssuePluginEventAndData from the Unity side.
+// Must stay in sync with the C# enum on the Unity side.
+enum RenderEventType
+{
+    Sync_RenderStart,
+    Sync_RenderEnd,
+    Upscale_DLSS,
+    Cleanup_DLSS,
+    Upscale_MetalFX_Spatial,
+    Upscale_MetalFX_Temporal,
+    Cleanup_MetalFX,
+    RenderEventCount,
+};
+
 struct DLSSSettings
 {
 	int optimalRenderSizeX;

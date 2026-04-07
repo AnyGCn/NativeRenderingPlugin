@@ -102,17 +102,7 @@ extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityRenderingExtQuer
 // This will be called for GL.IssuePluginEvent script calls; eventID will
 // be the integer passed to IssuePluginEvent. In this example, we just ignore
 // that value.
-enum RenderEventType
-{
-	Sync_RenderStart,
-	Sync_RenderEnd,
-	Upscale_DLSS,
-	Cleanup_DLSS,
-	Upscale_MetalFX_Spatial,
-	Upscale_MetalFX_Temporal,
-	Cleanup_MetalFX,
-	RenderEventCount,
-};
+// RenderEventType enum is defined in RenderAPI.h
 
 static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void *data)
 {

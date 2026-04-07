@@ -114,7 +114,7 @@ sl::Resource RenderAPI_D3D11::AllocateTexture(const sl::ResourceAllocationDesc* 
 
 bool RenderAPI_D3D11::ProcessRenderingExtQuery(UnityRenderingExtQueryType query)
 {
-    if (query & kUnityRenderingExtQueryOverridePresentFrame)
+    if (query & kUnityRenderingExtQueryOverridePresentFrame && m_Graphics->GetSwapChain() != nullptr)
     {
         RenderAPI::s_UnityProfiler->BeginSample(RenderAPI::s_ProfilerPresentMarker);
         SLWrapper::Get().ReflexCallback_PresentStart();
