@@ -9,6 +9,24 @@
 
 struct IUnityInterfaces;
 
+struct TopLevelAccelerationStructureElementDescriptor
+{
+    int meshIndex;
+    float transformMatrix[16];
+};
+
+struct BottomLevelAccelerationStructureDescriptor
+{
+    void* positionBuffer;
+    int vertexBufferOffset;
+    int vertexFormat;
+    int vertexStride;
+    void* indexBuffer;
+    int indexBufferOffset;
+    int indexType;
+    int indexCount;
+};
+
 struct CameraData
 {
     //! Specifies matrix transformation from the camera view to the clip space.
@@ -156,6 +174,8 @@ public:
     virtual void UpscaleTextureMetalFXSpatial() {}
 	virtual void UpscaleTextureMetalFXTemporal() {}
     virtual void CleanupMetalFX() {}
+    virtual void SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int count) {}
+    virtual void SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int count) {}
 
     // --------------------------------------------------------------------------
     // NVIDIA plugin specific functions

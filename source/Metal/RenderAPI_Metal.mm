@@ -1,38 +1,8 @@
-
-#include "RenderAPI.h"
 #include "PlatformBase.h"
-
-
-// Metal implementation of RenderAPI.
-
 
 #if SUPPORT_METAL
 
-#include "Unity/IUnityGraphicsMetal.h"
-#import <Metal/Metal.h>
-#import <MetalFX/MetalFX.h>
-
-class API_AVAILABLE(ios(16.0), macos(13.0)) RenderAPI_Metal : public RenderAPI
-{
-public:
-	RenderAPI_Metal();
-    ~RenderAPI_Metal() override { }
-
-	virtual void ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces) override;
-
-    virtual bool SupportMetalFX() override;
-    virtual void UpscaleTextureMetalFXSpatial() override;
-    virtual void UpscaleTextureMetalFXTemporal() override;
-    virtual void CleanupMetalFX() override;
-private:
-	void CreateResources();
-
-private:
-    IUnityGraphicsMetalV2*	m_MetalGraphics;
-    id<MTLFXSpatialScaler>  m_spatialScaler;
-    id<MTLFXTemporalScaler> m_temporalScaler;
-};
-
+#include "RenderAPI_Metal.h"
 
 RenderAPI* CreateRenderAPI_Metal()
 {
@@ -54,8 +24,15 @@ void RenderAPI_Metal::CreateResources()
 
 RenderAPI_Metal::RenderAPI_Metal()
 {
+    if (@available(iOS 17.0, macOS 14.0, *))
+        m_accelerationStructure = new AccelerationStructure();
 }
 
+RenderAPI_Metal::~RenderAPI_Metal()
+{
+    if (@available(iOS 17.0, macOS 14.0, *))
+        delete m_accelerationStructure;
+}
 
 void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces)
 {
@@ -177,6 +154,15 @@ bool RenderAPI_Metal::SupportMetalFX()
         return true;
     else
         return false;
+}
+
+void RenderAPI_Metal::SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int meshCount) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetBlasDescriptors(blasDescriptors, pSubmeshCount, meshCount);
+}
+void RenderAPI_Metal::SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int instanceCount) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetTlasDescriptors(tlasDescriptor, instanceCount);
 }
 
 #endif // #if SUPPORT_METAL

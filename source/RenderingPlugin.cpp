@@ -192,6 +192,16 @@ extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportMetalFX()
 	return s_CurrentAPI->SupportMetalFX();
 }
 
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int count)
+{
+	s_CurrentAPI->SetBlasDescriptors(blasDescriptors, pSubmeshCount, count);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int count)
+{
+	s_CurrentAPI->SetTlasDescriptors(tlasDescriptor, count);
+}
+
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS()
 {
 	return s_CurrentAPI->SupportDLSS();

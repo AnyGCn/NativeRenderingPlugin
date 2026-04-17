@@ -16,7 +16,10 @@ EXPORTS
    Sync_SimulateEnd
    IsValid
    SupportMetalFX
+   SetBlasDescriptors
+   SetTlasDescriptors
    SupportDLSS
    SupportDLSS_FG
    SetDLSSOptions
    QueryDLSSOptimalSettings
+   
