@@ -6,20 +6,11 @@ PRIVATE
 )
 
 if (WIN32)
-    target_sources(RenderingPlugin
-        PRIVATE
-            RenderAPI_D3D.cpp
-            RenderAPI_D3D11.cpp
-            RenderAPI_D3D12.cpp
-            SLWrapper.cpp
-    )
+    add_subdirectory(Windows)
 endif()
 
 if (Apple)
-    target_sources(RenderingPlugin
-        PRIVATE
-            RenderAPI_Metal.mm
-    )
+        add_subdirectory(Metal)
 endif()
 
 if (Android)

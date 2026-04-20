@@ -1,4 +1,4 @@
-#include "PlatformBase.h"
+#include "../PlatformBase.h"
 
 // Direct3D 11 implementation of RenderAPI.
 
@@ -9,7 +9,7 @@
 
 #include "RenderAPI_D3D.h"
 #include "SLWrapper.h"
-#include "Unity/IUnityGraphicsD3D11.h"
+#include "../Unity/IUnityGraphicsD3D11.h"
 
 class RenderAPI_D3D11 : public RenderAPI_D3D
 {

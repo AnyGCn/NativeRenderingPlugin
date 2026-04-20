@@ -6,7 +6,7 @@
 #include <sl_version.h>
 #include <dxgi.h>
 
-#include "RenderAPI.h"
+#include "../RenderAPI.h"
 
 class RenderAPI_D3D : public RenderAPI
 {

@@ -1,4 +1,4 @@
-#include "PlatformBase.h"
+#include "../PlatformBase.h"
 
 // Direct3D 12 implementation of RenderAPI.
 
@@ -15,7 +15,7 @@
 #include <map>
 #include <iostream>
 
-#include "Unity/IUnityGraphicsD3D12.h"
+#include "../Unity/IUnityGraphicsD3D12.h"
 #include "RenderAPI_D3D.h"
 #include "SLWrapper.h"
 

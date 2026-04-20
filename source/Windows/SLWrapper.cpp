@@ -46,7 +46,7 @@
 #include <climits>
 
 #include "RenderAPI_D3D.h"
-#include "PlatformBase.h"
+#include "../PlatformBase.h"
 
 void logFunctionCallback(sl::LogType type, const char* msg)
 {

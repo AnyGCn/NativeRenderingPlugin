@@ -44,7 +44,7 @@
 #include <sl_reflex.h>
 #include <sl_dlss_g.h>
 
-#include "Unity/IUnityGraphics.h"
+#include "../Unity/IUnityGraphics.h"
 
 struct CameraData;
 struct DLSSSettings;
