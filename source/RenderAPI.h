@@ -117,6 +117,8 @@ enum TextureType
 	eHUDLessColor,
 	eScalingInputColor,
 	eScalingOutputColor,
+    eNormal,
+    eRaytracingOutput,
 	eTextureTypeCount,
 };
 
@@ -131,6 +133,8 @@ enum RenderEventType
     Upscale_MetalFX_Spatial,
     Upscale_MetalFX_Temporal,
     Cleanup_MetalFX,
+    Dispatch_Raytracing,
+    Cleanup_Raytracing,
     RenderEventCount,
 };
 
@@ -176,6 +180,9 @@ public:
     virtual void CleanupMetalFX() {}
     virtual void SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int count) {}
     virtual void SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int count) {}
+    virtual bool SupportRaytracing() { return false; }
+    virtual void DispatchRaytracing() {}
+    virtual void CleanupRaytracing() {}
 
     // --------------------------------------------------------------------------
     // NVIDIA plugin specific functions

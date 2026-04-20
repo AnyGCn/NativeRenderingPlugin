@@ -20,6 +20,9 @@ public:
     virtual void UpscaleTextureMetalFXSpatial() override;
     virtual void UpscaleTextureMetalFXTemporal() override;
     virtual void CleanupMetalFX() override;
+    virtual bool SupportRaytracing() override;
+    virtual void DispatchRaytracing() override;
+    virtual void CleanupRaytracing() override;
     virtual void SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int meshCount) override;
     virtual void SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int instanceCount) override;
 

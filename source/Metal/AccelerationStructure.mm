@@ -8,18 +8,43 @@
 #include "RenderAPI_Metal.h"
 #include "ShaderDefinition.h"
 
+// Helper Objective-C class to locate the plugin's bundle via bundleForClass:
+@interface _RenderingPluginBundleLocator : NSObject
+@end
+@implementation _RenderingPluginBundleLocator
+@end
+
 void AccelerationStructure::Initialize(id<MTLDevice> device)
 {
     _device = device;
-    id<MTLLibrary> defaultLibrary = [_device newDefaultLibrary];
-    _rtReflectionFunction = [defaultLibrary newFunctionWithName:@"rtReflection"];
 
-    NSError* error;
+    // Find the bundle that contains this plugin's compiled code
+    NSBundle* pluginBundle = [NSBundle bundleForClass:[_RenderingPluginBundleLocator class]];
+
+    NSError* error = nil;
+    id<MTLLibrary> defaultLibrary = [_device newDefaultLibraryWithBundle:pluginBundle error:&error];
+    if (error)
+    {
+        RenderAPI::LogError("Failed to load default metallib from plugin bundle: %s", error.localizedDescription.UTF8String);
+        return;
+    }
+
+    _rtReflectionFunction = [defaultLibrary newFunctionWithName:@"rtReflection"];
+    if (_rtReflectionFunction == nil)
+    {
+        RenderAPI::LogError("Failed to load default metallib from plugin bundle: %s", error.localizedDescription.UTF8String);
+        return;
+    }
+
     _rtReflectionPipeline = [_device newComputePipelineStateWithFunction:_rtReflectionFunction error:&error];
     if (error)
     {
         RenderAPI::LogError("Failed to create RT reflection compute pipeline state: %s", error.localizedDescription.UTF8String);
+        return;
     }
+
+    _accelerationStructureBuildEvent = [_device newEvent];
+    _initialized = true;
 }
 
 MTLAccelerationStructureSizes AccelerationStructure::calculateSizeForPrimitiveAccelerationStructures(NSArray<MTLPrimitiveAccelerationStructureDescriptor*>*primitiveAccelerationDescriptors)
@@ -164,4 +189,21 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
 
     // Set the ray tracing reflection kernel.
     [compEnc setComputePipelineState:_rtReflectionPipeline];
+}
+
+void AccelerationStructure::CleanupRaytracing()
+{
+    // Release acceleration structure resources
+    _instanceAccelerationStructure = nil;
+    primitiveAccelerationStructures = nil;
+    _accelerationStructureHeap = nil;
+
+    // Release descriptor arrays
+    _primitiveAccelerationDescriptors = nil;
+
+    // Release argument buffer
+    _sceneArgumentBuffer = nil;
+
+    // Clear C++ containers
+    _instanceDescriptors.clear();
 }

@@ -116,29 +116,35 @@ static void UNITY_INTERFACE_API OnRenderEventWithData(int eventID, void *data)
 
 	switch (eventID)
 	{
-	case Sync_RenderStart:
-		s_CurrentAPI->ReflexCallback_RenderStart(frameID);
-		break;
-	case Sync_RenderEnd:
-		s_CurrentAPI->ReflexCallback_RenderEnd(frameID);
-		break;
-	case Upscale_DLSS:
-		s_CurrentAPI->UpscaleTextureDLSS();
-		break;
-	case Cleanup_DLSS:
-		s_CurrentAPI->CleanupDLSS();
-		break;
-	case Upscale_MetalFX_Spatial:
-		s_CurrentAPI->UpscaleTextureMetalFXSpatial();
-		break;
-	case Upscale_MetalFX_Temporal:
-		s_CurrentAPI->UpscaleTextureMetalFXTemporal();
-		break;
-	case Cleanup_MetalFX:
-		s_CurrentAPI->CleanupMetalFX();
-		break;
-	default:
-		break;
+        case Sync_RenderStart:
+            s_CurrentAPI->ReflexCallback_RenderStart(frameID);
+            break;
+        case Sync_RenderEnd:
+            s_CurrentAPI->ReflexCallback_RenderEnd(frameID);
+            break;
+        case Upscale_DLSS:
+            s_CurrentAPI->UpscaleTextureDLSS();
+            break;
+        case Cleanup_DLSS:
+            s_CurrentAPI->CleanupDLSS();
+            break;
+        case Upscale_MetalFX_Spatial:
+            s_CurrentAPI->UpscaleTextureMetalFXSpatial();
+            break;
+        case Upscale_MetalFX_Temporal:
+            s_CurrentAPI->UpscaleTextureMetalFXTemporal();
+            break;
+        case Cleanup_MetalFX:
+            s_CurrentAPI->CleanupMetalFX();
+            break;
+        case Dispatch_Raytracing:
+            s_CurrentAPI->DispatchRaytracing();
+            break;
+        case Cleanup_Raytracing:
+            s_CurrentAPI->CleanupRaytracing();
+            break;
+        default:
+            break;
 	}
 }
 
@@ -190,6 +196,11 @@ extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API IsValid()
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportMetalFX()
 {
 	return s_CurrentAPI->SupportMetalFX();
+}
+
+extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportRaytracing()
+{
+    return s_CurrentAPI->SupportRaytracing();
 }
 
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int count)
