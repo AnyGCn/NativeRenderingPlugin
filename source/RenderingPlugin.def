@@ -17,8 +17,9 @@ EXPORTS
    IsValid
    SupportMetalFX
    SupportRaytracing
-   SetBlasDescriptors
-   SetTlasDescriptors
+   SetRaytracingMaterials
+   SetRaytracingMeshes
+   SetRaytracingInstances
    SupportDLSS
    SupportDLSS_FG
    SetDLSSOptions

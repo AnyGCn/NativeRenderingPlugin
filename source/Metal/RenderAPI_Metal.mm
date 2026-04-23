@@ -36,19 +36,19 @@ RenderAPI_Metal::~RenderAPI_Metal()
 
 void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces)
 {
-	if (type == kUnityGfxDeviceEventInitialize)
-	{
-		m_MetalGraphics = interfaces->Get<IUnityGraphicsMetalV2>();
+    if (type == kUnityGfxDeviceEventInitialize)
+    {
+        m_MetalGraphics = interfaces->Get<IUnityGraphicsMetalV2>();
         MTLFXSpatialScalerDescriptorClass = NSClassFromString(@"MTLFXSpatialScalerDescriptor");
         MTLFXTemporalScalerDescriptorClass = NSClassFromString(@"MTLFXTemporalScalerDescriptor");
         if (@available(iOS 17.0, macOS 14.0, *))
             m_accelerationStructure->Initialize(m_MetalGraphics->MetalDevice());
-		CreateResources();
-	}
-	else if (type == kUnityGfxDeviceEventShutdown)
-	{
-		//@TODO: release resources
-	}
+        CreateResources();
+    }
+    else if (type == kUnityGfxDeviceEventShutdown)
+    {
+        //@TODO: release resources
+    }
 }
 
 void RenderAPI_Metal::UpscaleTextureMetalFXSpatial() API_AVAILABLE(ios(16.0), macosx(13.0))
@@ -166,25 +166,30 @@ bool RenderAPI_Metal::SupportRaytracing()
         return false;
 }
 
-void RenderAPI_Metal::SetBlasDescriptors(const BottomLevelAccelerationStructureDescriptor* blasDescriptors, const int* pSubmeshCount, int meshCount) API_AVAILABLE(ios(17.0), macosx(14.0))
+void RenderAPI_Metal::SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
-    m_accelerationStructure->SetBlasDescriptors(blasDescriptors, pSubmeshCount, meshCount);
+    m_accelerationStructure->SetMaterials(pMaterials, count);
 }
-void RenderAPI_Metal::SetTlasDescriptors(const TopLevelAccelerationStructureElementDescriptor* tlasDescriptor, int instanceCount) API_AVAILABLE(ios(17.0), macosx(14.0))
+
+void RenderAPI_Metal::SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
-    m_accelerationStructure->SetTlasDescriptors(tlasDescriptor, instanceCount);
+    m_accelerationStructure->SetMeshes(pMeshes, count);
+}
+
+void RenderAPI_Metal::SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetInstances(pInstances, count);
 }
 
 void RenderAPI_Metal::DispatchRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))
 {
-    id<MTLTexture> input = (__bridge id<MTLTexture>)m_Textures[eScalingInputColor];
     id<MTLTexture> depth = (__bridge id<MTLTexture>)m_Textures[eDepth];
-    id<MTLTexture> motion = (__bridge id<MTLTexture>)m_Textures[eMotionVectors];
+    id<MTLTexture> normal = (__bridge id<MTLTexture>)m_Textures[eNormal];
     id<MTLTexture> output = (__bridge id<MTLTexture>)m_Textures[eRaytracingOutput];
     id<MTLCommandBuffer> commandBuffer = m_MetalGraphics->CurrentCommandBuffer();
     if (commandBuffer == nil) return;
     m_MetalGraphics->EndCurrentCommandEncoder();
-    m_accelerationStructure->DispatchRaytracing(commandBuffer, output, output, output);
+    m_accelerationStructure->DispatchRaytracing(commandBuffer, m_CameraData, output, depth, normal);
 }
 
 void RenderAPI_Metal::CleanupRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))

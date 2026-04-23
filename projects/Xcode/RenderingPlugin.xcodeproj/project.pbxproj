@@ -32,6 +32,7 @@
 		2B6899C21CF839A600C4BA4F /* IUnityGraphics.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityGraphics.h; path = ../../source/Unity/IUnityGraphics.h; sourceTree = "<group>"; };
 		2B6899C61CF839A600C4BA4F /* IUnityGraphicsMetal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityGraphicsMetal.h; path = ../../source/Unity/IUnityGraphicsMetal.h; sourceTree = "<group>"; };
 		2B6899C71CF839A600C4BA4F /* IUnityInterface.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IUnityInterface.h; path = ../../source/Unity/IUnityInterface.h; sourceTree = "<group>"; };
+		870D66CF2F99F7C50013E931 /* RenderStructures.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RenderStructures.h; path = /Users/guoyuning/Documents/NativeRenderingPlugin/source/RenderStructures.h; sourceTree = "<absolute>"; };
 		871CD3DA2F7A796F00BCA467 /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.4.sdk/System/Library/Frameworks/MetalFX.framework; sourceTree = DEVELOPER_DIR; };
 		87361F3D2CF35ADF00BBA4B3 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		874849F82CF30831003425EF /* MetalFX.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalFX.framework; path = System/Library/Frameworks/MetalFX.framework; sourceTree = SDKROOT; };
@@ -100,6 +101,7 @@
 		08FB77AFFE84173DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				870D66CF2F99F7C50013E931 /* RenderStructures.h */,
 				87BB9C272F9226970093534D /* Metal */,
 				2B6899BC1CF8398200C4BA4F /* Unity */,
 				2B6899AB1CF8396700C4BA4F /* PlatformBase.h */,
