@@ -184,7 +184,7 @@ bool SLWrapper::Initialize_preDevice()
     pref.featuresToLoad = featuresToLoad;
     pref.numFeaturesToLoad = static_cast<uint32_t>(std::size(featuresToLoad));
     pref.flags = sl::PreferenceFlags::eDisableCLStateTracking;
-    // pref.flags |= sl::PreferenceFlags::eUseManualHooking;
+    pref.flags |= sl::PreferenceFlags::eUseManualHooking;
     pref.flags |= sl::PreferenceFlags::eUseFrameBasedResourceTagging;
 
     auto pathDll = GetSlInterposerDllLocation();

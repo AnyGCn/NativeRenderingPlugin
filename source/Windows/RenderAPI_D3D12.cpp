@@ -49,6 +49,11 @@ private:
     IUnityGraphicsD3D12v7*  m_Graphics;
     ID3D12Device*           m_Device;
 
+    // SL proxy SwapChain for manual hooking (triggers presentCommon each frame)
+    IDXGISwapChain*                m_proxySwapChain = nullptr;
+    // Track the native SwapChain pointer so we can detect when Unity recreates it
+    IDXGISwapChain*                m_nativeSwapChain = nullptr;
+
     ID3D12CommandAllocator*        m_streamline_cmd_allocator;
     ID3D12GraphicsCommandList*     m_streamline_cmd_list;
     UINT64                         m_streamline_fence = 0;
@@ -58,6 +63,7 @@ private:
     void initialize_and_create_resources();
     void release_resources();
     void wait_for_unity_frame_fence(UINT64 fence_value);
+    void upgradeSwapChainProxy(IDXGISwapChain* nativeSwapChain);
 };
 
 RenderAPI* CreateRenderAPI_D3D12()
@@ -108,6 +114,12 @@ void RenderAPI_D3D12::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
         break;
     case kUnityGfxDeviceEventShutdown:
         SLWrapper::Get().Shutdown();
+        if (m_proxySwapChain && m_proxySwapChain != m_nativeSwapChain)
+        {
+            m_proxySwapChain->Release();
+        }
+        m_proxySwapChain = nullptr;
+        m_nativeSwapChain = nullptr;
         release_resources();
         break;
     default:
@@ -137,6 +149,28 @@ void RenderAPI_D3D12::release_resources()
     SAFE_RELEASE(m_streamline_cmd_allocator);
 
     CloseHandle(m_fence_event);
+}
+
+void RenderAPI_D3D12::upgradeSwapChainProxy(IDXGISwapChain* nativeSwapChain)
+{
+    // Release old proxy if it differs from the old native pointer
+    if (m_proxySwapChain && m_proxySwapChain != m_nativeSwapChain)
+    {
+        m_proxySwapChain->Release();
+    }
+
+    m_nativeSwapChain = nativeSwapChain;
+    m_proxySwapChain = nativeSwapChain;
+    sl::Result res = slUpgradeInterface(reinterpret_cast<void**>(&m_proxySwapChain));
+    if (res != sl::Result::eOk)
+    {
+        RenderAPI::LogError("Failed to upgrade SwapChain to SL proxy, falling back to native SwapChain");
+        m_proxySwapChain = nativeSwapChain;
+    }
+    else
+    {
+        RenderAPI::LogInfo("SwapChain upgraded to SL proxy successfully");
+    }
 }
 
 void RenderAPI_D3D12::wait_for_unity_frame_fence(UINT64 fence_value)
@@ -225,11 +259,24 @@ sl::Resource RenderAPI_D3D12::AllocateTexture(const sl::ResourceAllocationDesc* 
 
 bool RenderAPI_D3D12::ProcessRenderingExtQuery(UnityRenderingExtQueryType query)
 {
-    if (query & kUnityRenderingExtQueryOverridePresentFrame && m_Graphics->GetSwapChain() != nullptr)
+    if (query & kUnityRenderingExtQueryOverridePresentFrame)
     {
+        IDXGISwapChain* currentNative = m_Graphics->GetSwapChain();
+        if (!currentNative)
+            return false;
+
+        // Detect SwapChain recreation (e.g. resolution change) and re-upgrade
+        if (currentNative != m_nativeSwapChain)
+        {
+            RenderAPI::LogInfo("SwapChain change detected, re-upgrading to SL proxy");
+            upgradeSwapChainProxy(currentNative);
+        }
+
         RenderAPI::s_UnityProfiler->BeginSample(RenderAPI::s_ProfilerPresentMarker);
         SLWrapper::Get().ReflexCallback_PresentStart();
-        m_Graphics->GetSwapChain()->Present(m_Graphics->GetSyncInterval(), m_Graphics->GetPresentFlags());
+        // Call Present through the SL proxy SwapChain so that Streamline's
+        // presentCommon() is invoked automatically for internal bookkeeping.
+        m_proxySwapChain->Present(m_Graphics->GetSyncInterval(), m_Graphics->GetPresentFlags());
         SLWrapper::Get().ReflexCallback_PresentEnd();
         RenderAPI::s_UnityProfiler->EndSample(RenderAPI::s_ProfilerPresentMarker);
         return true;
