@@ -2,12 +2,14 @@
 
 #include <simd/simd.h>
 
-typedef enum RTReflectionKernelImageIndex
+#define AAPL_MAX_LIGHTS_COUNT 32
+
+typedef enum AAPLRTReflectionKernelImageIndex
 {
-    OutImageIndex                   = 0,
-    GBufferDepthIndex               = 1,
-    GBufferNormalIndex              = 2,
-    IrradianceMapIndex              = 3
+    AAPLRaytracingOutImageIndex                 = 0,
+    AAPLRaytracingGBufferDepthIndex             = 1,
+    AAPLRaytracingGBufferNormalIndex            = 2,
+    AAPLRaytracingGBufferMaskIndex              = 3
 } RTReflectionKernelImageIndex;
 
 typedef enum AAPLTextureIndex
@@ -15,17 +17,17 @@ typedef enum AAPLTextureIndex
     AAPLTextureIndexBaseColor,
     AAPLTextureIndexNormal,
     AAPLTextureIndexMask,
-//    AAPLTextureIndexOcclusion,
+    AAPLTextureIndexEmission,
     AAPLMaterialTextureCount,
 } AAPLTextureIndex;
 
-typedef enum RTReflectionKernelBufferIndex
+typedef enum AAPLRTReflectionKernelBufferIndex
 {
     AAPLBufferIndexScene,
     AAPLBufferIndexAccelerationStructure,
     AAPLBufferIndexCameraData,
     AAPLBufferIndexLightData,
-} RTReflectionKernelBufferIndex;
+} AAPLRTReflectionKernelBufferIndex;
 
 typedef struct AAPLCameraData
 {
@@ -36,13 +38,14 @@ typedef struct AAPLCameraData
     float roughnessBias;
 } AAPLCameraData;
 
-typedef struct
+typedef struct AAPLLightStruct
 {
     // Per Light Properties
-    vector_float3 directionalLightInvDirection;
-    float lightIntensity;
-
-} AAPLLightData;
+    vector_float4 attenuation;
+    vector_float4 color;
+    vector_float4 direction;
+    vector_float4 position;
+} AAPLLightStruct;
 
 typedef enum AAPLArgumentBufferID
 {
@@ -123,7 +126,7 @@ inline bool IsUVHalf(uint32_t vertexParameters)
 #include <metal_stdlib>
 using namespace metal;
 
-struct Instance
+struct AAPLInstance
 {
     // A reference to a single mesh in the meshes array stored in structure `Scene`.
     uint32_t meshIndex [[id(0)]];
@@ -135,7 +138,7 @@ struct Instance
     float4x4 transform [[id(2)]];
 };
 
-struct Mesh
+struct AAPLMesh
 {
     // The arrays of vertices.
     // position stride 8 bit
@@ -155,30 +158,40 @@ struct Mesh
     constant uint8_t* indices   [[ id( AAPLArgumentBufferIDMeshIndices   ) ]];
 };
 
-struct Material
+struct AAPLMaterial
 {
-    array<texture2d<float>, AAPLMaterialTextureCount> textures [[ id( AAPLArgumentBufferIDMaterialTextures ) ]];
+    array<texture2d<half>, AAPLMaterialTextureCount> textures [[ id( AAPLArgumentBufferIDMaterialTextures ) ]];
+    float4 _BaseColor;
+    float4 _Emission;
+    float _BumpScale;
+    float _Metallic;
+    float _Roughness;
 };
 
-struct Scene
+struct AAPLScene
 {
     // The array of instances.
-    constant Instance* instances    [[ id( AAPLArgumentBufferIDSceneInstances ) ]];
-    constant Mesh* meshes           [[ id( AAPLArgumentBufferIDSceneMeshes )]];
-    constant Material* materials    [[ id( AAPLArgumentBufferIDSceneMaterials ) ]];
+    constant AAPLInstance* instances    [[ id( AAPLArgumentBufferIDSceneInstances ) ]];
+    constant AAPLMesh* meshes           [[ id( AAPLArgumentBufferIDSceneMeshes )]];
+    constant AAPLMaterial* materials    [[ id( AAPLArgumentBufferIDSceneMaterials ) ]];
 };
 
+struct AAPLLightData
+{
+    uint32_t lightCount;
+    array<AAPLLightStruct, AAPL_MAX_LIGHTS_COUNT> lights;
+};
 
 #else
 
-struct Instance
+struct AAPLInstance
 {
     uint32_t meshIndex;
     uint32_t materialIndex;
     matrix_float4x4 transform;
 };
 
-struct Mesh
+struct AAPLMesh
 {
     // The arrays of vertices.
     // index format 1 bit
@@ -198,17 +211,23 @@ struct Mesh
     uint64_t indices;
 };
 
-struct Material
+struct AAPLMaterial
 {
     MTLResourceID textures[AAPLMaterialTextureCount];
 };
 
-struct Scene
+struct AAPLScene
 {
     // The array of instances.
     uint64_t instances;
     uint64_t meshes;
     uint64_t materials;
+};
+
+struct AAPLLightData
+{
+    uint32_t lightCount;
+    AAPLLightStruct lights[AAPL_MAX_LIGHTS_COUNT];
 };
 
 #endif

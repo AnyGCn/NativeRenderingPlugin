@@ -24,24 +24,26 @@ class API_AVAILABLE(ios(17.0), macos(14.0)) AccelerationStructure
 
     bool _accelerationStructureDirty;
     bool _initialized = false;
-    uint8_t _cameraBufferIndex = 0;
+    
+    uint8_t _constantBufferIndex = 0;
+    id<MTLBuffer> _cameraDataBuffers[kMaxBuffersInFlight];
+    id<MTLBuffer> _lightDataBuffers[kMaxBuffersInFlight];
 
     id<MTLDevice> _device;
-    
     id<MTLFunction> _rtReflectionFunction;
     id<MTLComputePipelineState> _rtReflectionPipeline;
-    
+
     id<MTLEvent> _accelerationStructureBuildEvent;
     id<MTLHeap> _accelerationStructureHeap;
 
-    id<MTLBuffer> _cameraDataBuffers[kMaxBuffersInFlight];
     id<MTLBuffer> _sceneArgumentBuffer;
     id<MTLAccelerationStructure> _instanceAccelerationStructure;
     NSArray< id<MTLAccelerationStructure> > *primitiveAccelerationStructures;
     
+    std::vector<InstanceDescriptor> _instanceDescriptors;
+    std::vector<LightDescriptor> _lightDescriptors;
     std::vector<MaterialDscriptor> _materialDescriptors;
     std::vector<MeshDescriptor> _meshDescriptors;
-    std::vector<InstanceDescriptor> _instanceDescriptors;
     
     NSMutableArray<id<MTLResource>>* _sceneResources;
     NSMutableArray<id<MTLHeap>>* _sceneHeaps;
@@ -56,9 +58,10 @@ public:
     ~AccelerationStructure() {}
 
     void Initialize(id<MTLDevice> device);
-    void SetMeshes(const MeshDescriptor* meshes, int count);
     void SetInstances(const InstanceDescriptor* instances, int count);
+    void SetLights(const LightDescriptor *lights, int count);
     void SetMaterials(const MaterialDscriptor* materials, int count);
+    void SetMeshes(const MeshDescriptor* meshes, int count);
 
     void BuildBottomLevelAccelerationStructure(id<MTLCommandBuffer> cmd);
     void BuildTopLevelAccelerationStructure(id<MTLCommandBuffer> cmd);

@@ -23,9 +23,10 @@ public:
     virtual bool SupportRaytracing() override;
     virtual void DispatchRaytracing() override;
     virtual void CleanupRaytracing() override;
+    virtual void SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) override;
+    virtual void SetRaytracingLights(const LightDescriptor* pLights, int count) override;
     virtual void SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) override;
     virtual void SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count) override;
-    virtual void SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) override;
 
 private:
     void CreateResources();

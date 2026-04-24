@@ -38,19 +38,85 @@ float3 UnpackNormalOctQuadEncode(float2 f)
 }
 
 // HLSL-style UnpackOctNormal translated to Metal
-float3 UnpackOctNormal(float3 pn)
+float3 UnpackOctNormal(half3 pn)
 {
-    float2 remappedOctNormalWS = Unpack888ToFloat2(pn);
+    float2 remappedOctNormalWS = Unpack888ToFloat2(float3(pn));
     float2 octNormalWS = remappedOctNormalWS * 2.0f - 1.0f;
     return UnpackNormalOctQuadEncode(octNormalWS);
+}
+
+struct LightParameter
+{
+    half3  direction;
+    float   distanceAttenuation; // full-float precision required on some platforms
+    half3   color;
+    half    shadowAttenuation;
+};
+
+// Matches Unity Vanilla HINT_NICE_QUALITY attenuation
+// Attenuation smoothly decreases to light range.
+float DistanceAttenuation(float distanceSqr, half2 distanceAttenuation)
+{
+    // We use a shared distance attenuation for additional directional and puctual lights
+    // for directional lights attenuation will be 1
+    float lightAtten = 1.0f / distanceSqr;
+    float2 distanceAttenuationFloat = float2(distanceAttenuation);
+
+    // Use the smoothing factor also used in the Unity lightmapper.
+    half factor = half(distanceSqr * distanceAttenuationFloat.x);
+    half smoothFactor = saturate(half(1.0) - factor * factor);
+    smoothFactor = smoothFactor * smoothFactor;
+
+    return lightAtten * smoothFactor;
+}
+
+half AngleAttenuation(half3 spotDirection, half3 lightDirection, half2 spotAttenuation)
+{
+    // Spot Attenuation with a linear falloff can be defined as
+    // (SdotL - cosOuterAngle) / (cosInnerAngle - cosOuterAngle)
+    // This can be rewritten as
+    // invAngleRange = 1.0 / (cosInnerAngle - cosOuterAngle)
+    // SdotL * invAngleRange + (-cosOuterAngle * invAngleRange)
+    // SdotL * spotAttenuation.x + spotAttenuation.y
+
+    // If we precompute the terms in a MAD instruction
+    half SdotL = dot(spotDirection, lightDirection);
+    half atten = saturate(SdotL * spotAttenuation.x + spotAttenuation.y);
+    return atten * atten;
+}
+
+// Fills a light struct given a perObjectLightIndex
+LightParameter GetLightParameter(AAPLLightStruct lightData, float3 positionWS)
+{
+    // Abstraction over Light input constants
+    float4 lightPositionWS = lightData.position;
+    half3 color = half3(lightData.color.rgb);
+    half4 distanceAndSpotAttenuation = half4(lightData.attenuation);
+    half4 spotDirection = half4(lightData.direction);
+
+    // Directional lights store direction in lightPosition.xyz and have .w set to 0.0.
+    // This way the following code will work for both directional and punctual lights.
+    float3 lightVector = lightPositionWS.xyz - positionWS * lightPositionWS.w;
+    float distanceSqr = max(dot(lightVector, lightVector), FLT_MIN);
+
+    half3 lightDirection = half3(lightVector * rsqrt(distanceSqr));
+    // full-float precision required on some platforms
+    float attenuation = DistanceAttenuation(distanceSqr, distanceAndSpotAttenuation.xy) * AngleAttenuation(spotDirection.xyz, lightDirection, distanceAndSpotAttenuation.zw);
+
+    LightParameter light;
+    light.direction = lightDirection;
+    light.distanceAttenuation = attenuation;
+    light.shadowAttenuation = 1.0; // This value can later be overridden in GetAdditionalLight(uint i, float3 positionWS, half4 shadowMask)
+    light.color = color;
+    return light;
 }
 
 typedef struct
 {
     float3 worldPosition;
-    float3 normal;
-    float3 tangent;
-    float3 bitangent;
+    half3 normal;
+    half3 tangent;
+    half3 bitangent;
     float2 texCoord;
 } Varyings;
 
@@ -111,7 +177,7 @@ float3x4 LoadVertexDataDimension4(constant uint8_t* pData, uint32_t i0, uint32_t
     return dataArray;
 }
 
-Varyings LoadVertexData(uint primitive_id, float3 bary3, Instance instance, Mesh mesh)
+Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, AAPLMesh mesh)
 {
     uint32_t i0, i1, i2;
     if (IsIndexHalf(mesh.vertexParameters))
@@ -144,19 +210,19 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, Instance instance, Mesh
     stride = GetGenericStride(mesh.vertexParameters);
     isHalf = IsNormalHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension3(pGenerics, i0, i1, i2, stride, isHalf);
-    vertexOutput.normal = (dataArray * bary3).xyz;
+    vertexOutput.normal = half4(dataArray * bary3).xyz;
     pGenerics += isHalf ? 8 : 12;
 
     // Tangent
     isHalf = IsTangentHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension4(pGenerics, i0, i1, i2, stride, isHalf);
     float4 tangentW = dataArray * bary3;
-    vertexOutput.tangent = tangentW.xyz;
+    vertexOutput.tangent = half4(tangentW).xyz;
     pGenerics += isHalf ? 8 : 16;
 
     // Bitangent
     float4x4 mv = instance.transform;
-    float3x3 normalMx = float3x3(mv.columns[0].xyz, mv.columns[1].xyz, mv.columns[2].xyz);
+    half3x3 normalMx = half3x3(half3(mv.columns[0].xyz), half3(mv.columns[1].xyz), half3(mv.columns[2].xyz));
     vertexOutput.normal = normalize(normalMx * vertexOutput.normal);
     vertexOutput.tangent = normalize(normalMx * vertexOutput.tangent);
     vertexOutput.bitangent = cross(vertexOutput.normal, vertexOutput.tangent) * sign(tangentW.w);
@@ -172,25 +238,6 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, Instance instance, Mesh
     return vertexOutput;
 }
 
-struct LightingParameters
-{
-    float3  lightDir;
-    float3  viewDir;
-    float3  halfVector;
-    float3  reflectedVector;
-    float3  normal;
-    float3  reflectedColor;
-    float3  irradiatedColor;
-    float4  baseColor;
-    float   nDoth;
-    float   nDotv;
-    float   nDotl;
-    float   hDotl;
-    float   metalness;
-    float   roughness;
-    float   ambientOcclusion;
-};
-
 constexpr sampler linearSampler (address::repeat,
                                  mip_filter::linear,
                                  mag_filter::linear,
@@ -203,52 +250,131 @@ float3 computeNormalMap(Varyings in, texture2d<float> normalMapTexture)
     return float3(normalize(in.normal * normalMap.z + in.tangent * normalMap.x + in.bitangent * normalMap.y));
 }
 
-LightingParameters calculateParameters(Varyings in,
-                                       AAPLCameraData cameraData,
-                                       constant AAPLLightData& lightData,
-                                       texture2d<float>   baseColorMap,
-                                       texture2d<float>   normalMap,
-                                       texture2d<float>   maskMap)
+struct MaterialParameter
 {
-    LightingParameters parameters;
-
-    parameters.baseColor = baseColorMap.sample(linearSampler, in.texCoord.xy);
-
-    parameters.normal = computeNormalMap(in, normalMap);
-
-    parameters.viewDir = normalize(cameraData.cameraPosition - float3(in.worldPosition));
-
-    float4 maskValue = maskMap.sample(linearSampler, in.texCoord.xy);
-    parameters.roughness = max(maskValue.y, 0.001f) * 0.8;
-
-    parameters.metalness = max(maskValue.z, 0.1);
-
-    parameters.ambientOcclusion = maskValue.x;
-
-    parameters.reflectedVector = reflect(-parameters.viewDir, parameters.normal);
+    half3 albedo;
+    half  alpha;
+    half3 normalWS;
+    half  smoothness;
+    half3 specular;
+    half  metallic;
+    half3 emission;
+    half  occlusion;
+    uint materialFlags;
     
-//    constexpr sampler linearFilterSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-//    float3 c = equirectangularSample(parameters.reflectedVector, linearFilterSampler, skydomeMap).rgb;
-//    parameters.irradiatedColor = clamp(c, 0.f, kMaxHDRValue);
+    half3 diffuse;
+    half reflectivity;
+    half perceptualRoughness;
+    half roughness;
+    half roughness2;
+    half grazingTerm;
 
-    parameters.lightDir = lightData.directionalLightInvDirection;
-    parameters.nDotl = max(0.001f,saturate(dot(parameters.normal, parameters.lightDir)));
+    // We save some light invariant BRDF terms so we don't have to recompute
+    // them in the light loop. Take a look at DirectBRDF function for detailed explaination.
+    half normalizationTerm;     // roughness * 4.0 + 2.0
+    half roughness2MinusOne;    // roughness^2 - 1.0
+};
 
-    parameters.halfVector = normalize(parameters.lightDir + parameters.viewDir);
-    parameters.nDoth = max(0.001f,saturate(dot(parameters.normal, parameters.halfVector)));
-    parameters.nDotv = max(0.001f,saturate(dot(parameters.normal, parameters.viewDir)));
-    parameters.hDotl = max(0.001f,saturate(dot(parameters.lightDir, parameters.halfVector)));
+half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0)
+{
+    half3 normal;
+    normal.xy = packedNormal.ag * 2.0 - 1.0;
+    normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
 
-    return parameters;
+    // must scale after reconstruction of normal.z which also
+    // mirrors UnpackNormalRGB(). This does imply normal is not returned
+    // as a unit length vector but doesn't need it since it will get normalized after TBN transformation.
+    // If we ever need to blend contributions with built-in shaders for URP
+    // then we should consider using UnpackDerivativeNormalAG() instead like
+    // HDRP does since derivatives do not use renormalization and unlike tangent space
+    // normals allow you to blend, accumulate and scale contributions correctly.
+    normal.xy *= scale;
+    return normal;
+}
+
+half3 UnpackNormalScale(half4 packedNormal, half scale = 1.0)
+{
+    // Convert to (?, y, 0, x)
+    packedNormal.a *= packedNormal.r;
+    return UnpackNormalAG(packedNormal, scale);
+}
+
+#define kDielectricSpec half4(0.04, 0.04, 0.04, 1.0 - 0.04) // standard dielectric reflectivity coef at incident angle (= 4%)
+
+half OneMinusReflectivityMetallic(half metallic)
+{
+    // We'll need oneMinusReflectivity, so
+    //   1-reflectivity = 1-lerp(dielectricSpec, 1, metallic) = lerp(1-dielectricSpec, 0, metallic)
+    // store (1-dielectricSpec) in kDielectricSpec.a, then
+    //   1-reflectivity = lerp(alpha, 0, metallic) = alpha + metallic*(0 - alpha) =
+    //                  = alpha - metallic * alpha
+    half oneMinusDielectricSpec = kDielectricSpec.a;
+    return oneMinusDielectricSpec - metallic * oneMinusDielectricSpec;
+}
+
+half PerceptualRoughnessToRoughness(half perceptualRoughness)
+{
+    return perceptualRoughness * perceptualRoughness;
+}
+
+half RoughnessToPerceptualRoughness(half roughness)
+{
+    return sqrt(roughness);
+}
+
+half RoughnessToPerceptualSmoothness(half roughness)
+{
+    return 1.0 - sqrt(roughness);
+}
+
+half PerceptualSmoothnessToRoughness(half perceptualSmoothness)
+{
+    return (1.0 - perceptualSmoothness) * (1.0 - perceptualSmoothness);
+}
+
+half PerceptualSmoothnessToPerceptualRoughness(half perceptualSmoothness)
+{
+    return (1.0 - perceptualSmoothness);
+}
+
+MaterialParameter InitializeMaterialData(Varyings in, AAPLMaterial materialData)
+{
+    MaterialParameter outMaterialData;
+    half4 albedoAlpha = materialData.textures[AAPLTextureIndexBaseColor].sample(linearSampler, in.texCoord.xy);
+    outMaterialData.alpha = albedoAlpha.a * materialData._BaseColor.a;
+    outMaterialData.albedo = albedoAlpha.rgb * half3(materialData._BaseColor.rgb);
+    
+    half4 ARM = materialData.textures[AAPLTextureIndexMask].sample(linearSampler, in.texCoord.xy);
+    outMaterialData.occlusion = ARM.r;
+    outMaterialData.metallic = ARM.b * materialData._Metallic;
+    outMaterialData.smoothness = 1.0f - (ARM.g * materialData._Roughness);
+    outMaterialData.specular = half3(0.0, 0.0, 0.0);
+    
+    half3 normalTS = UnpackNormalScale(materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy), materialData._BumpScale);
+    outMaterialData.emission = materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy).rgb * half3(materialData._Emission.rgb) * materialData._Emission.a;
+    half3x3 tangentToWorld = half3x3(in.tangent.xyz, in.bitangent.xyz, in.normal.xyz);
+    outMaterialData.normalWS = tangentToWorld * normalTS;
+    half oneMinusReflectivity = OneMinusReflectivityMetallic(outMaterialData.metallic);
+    half reflectivity = half(1.0) - oneMinusReflectivity;
+    outMaterialData.diffuse = outMaterialData.albedo * oneMinusReflectivity;
+    outMaterialData.specular = mix(kDielectricSpec.rgb, outMaterialData.albedo, outMaterialData.metallic);
+    outMaterialData.reflectivity = reflectivity;
+    outMaterialData.perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(outMaterialData.smoothness);
+    outMaterialData.roughness           = max(PerceptualRoughnessToRoughness(outMaterialData.perceptualRoughness), sqrt(HALF_MIN));
+    outMaterialData.roughness2          = max(outMaterialData.roughness * outMaterialData.roughness, HALF_MIN);
+    outMaterialData.grazingTerm         = saturate(outMaterialData.smoothness + outMaterialData.reflectivity);
+    outMaterialData.normalizationTerm   = outMaterialData.roughness * 4.0 + 2.0;
+    outMaterialData.roughness2MinusOne  = outMaterialData.roughness2 - 1.0;
+    return outMaterialData;
 }
 
 kernel void rtReflection(
-             texture2d< float, access::write >      outImage                [[texture(OutImageIndex)]],
-             texture2d< float >                     depth                   [[texture(GBufferDepthIndex)]],
-             texture2d< float >                     normalMap               [[texture(GBufferNormalIndex)]],
+             texture2d< half, access::write >      outImage                [[texture(AAPLRaytracingOutImageIndex)]],
+             texture2d< float >                     depth                   [[texture(AAPLRaytracingGBufferDepthIndex)]],
+             texture2d< half >                     normalMap               [[texture(AAPLRaytracingGBufferNormalIndex)]],
              constant AAPLCameraData&               cameraData              [[buffer(AAPLBufferIndexCameraData)]],
              constant AAPLLightData&                lightData               [[buffer(AAPLBufferIndexLightData)]],
-             constant Scene*                        pScene                  [[buffer(AAPLBufferIndexScene)]],
+             constant AAPLScene*                    pScene                  [[buffer(AAPLBufferIndexScene)]],
              instance_acceleration_structure        accelerationStructure   [[buffer(AAPLBufferIndexAccelerationStructure)]],
              uint2 tid [[thread_position_in_grid]])
 {
@@ -256,10 +382,10 @@ kernel void rtReflection(
     uint h = outImage.get_height();
     if ( tid.x < w && tid.y < h )
     {
-        float4 finalColor = float4( 0.0, 0.0, 0.0, 1.0 );
+        half4 finalColor = half4( 0.0, 0.0, 0.0, 1.0 );
         if (is_null_instance_acceleration_structure(accelerationStructure))
         {
-            finalColor = float4( 1.0, 0.0, 1.0, 1.0 );
+            finalColor = half4( 1.0, 0.0, 1.0, 1.0 );
         }
         else
         {
@@ -291,27 +417,20 @@ kernel void rtReflection(
                 float2 bary2 = intersection.triangle_barycentric_coord;
                 float3 bary3 = float3( 1.0 - (bary2.x + bary2.y), bary2.x, bary2.y );
                 
-                constant Instance& instance = pScene->instances[ intersection.instance_id ];
-                constant Mesh& mesh = pScene->meshes[instance.meshIndex];
-                constant Material& material = pScene->materials[instance.materialIndex];
+                constant AAPLInstance& instance = pScene->instances[ intersection.instance_id ];
+                constant AAPLMesh& mesh = pScene->meshes[instance.meshIndex];
+                constant AAPLMaterial& material = pScene->materials[instance.materialIndex];
                 Varyings vertexOutput = LoadVertexData(intersection.primitive_id, bary3, instance, mesh);
 
                 AAPLCameraData cd( cameraData );
                 cd.cameraPosition = r.origin;
                 vertexOutput.worldPosition = r.origin + r.direction * intersection.distance;
-                
-                LightingParameters params = calculateParameters(vertexOutput,
-                                                                cd,
-                                                                lightData,
-                                                                material.textures[AAPLTextureIndexBaseColor],
-                                                                material.textures[AAPLTextureIndexNormal],
-                                                                material.textures[AAPLTextureIndexMask]);
-                
-                finalColor = params.baseColor;
+                MaterialParameter matData = InitializeMaterialData(vertexOutput, material);
+                finalColor = half4(matData.albedo, 1.0);
             }
             else if ( intersection.type == raytracing::intersection_type::none )
             {
-                finalColor = float4( 0.0f, 0.0f, 0.0f, 1.0f );
+                finalColor = half4( 0.0f, 0.0f, 0.0f, 0.0f );
             }
         }
         outImage.write( finalColor, tid );

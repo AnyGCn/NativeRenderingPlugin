@@ -83,8 +83,10 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
     {
         _cameraDataBuffers[i] = [_device newBufferWithLength:sizeof(AAPLCameraData)
                                                  options:MTLResourceStorageModeShared];
-
         _cameraDataBuffers[i].label = [NSString stringWithFormat:@"CameraDataBuffer %d", i];
+        _lightDataBuffers[i] = [_device newBufferWithLength:sizeof(AAPLLightData)
+                                                 options:MTLResourceStorageModeShared];
+        _lightDataBuffers[i].label = [NSString stringWithFormat:@"LightDataBuffer %d", i];
     }
 
     _accelerationStructureBuildEvent = [_device newEvent];
@@ -142,6 +144,19 @@ id<MTLAccelerationStructure> AccelerationStructure::allocateAndBuildAcceleration
     return accelStructure;
 }
 
+void AccelerationStructure::SetInstances(const InstanceDescriptor *instances, int count)
+{
+    _instanceDescriptors.resize(count);
+    memcpy(_instanceDescriptors.data(), instances, count * sizeof(InstanceDescriptor));
+    _accelerationStructureDirty = true;
+}
+
+void AccelerationStructure::SetLights(const LightDescriptor *lights, int count)
+{
+    _lightDescriptors.resize(count);
+    memcpy(_lightDescriptors.data(), lights, count * sizeof(LightDescriptor));
+}
+
 void AccelerationStructure::SetMaterials(const MaterialDscriptor *materials, int count)
 {
     _materialDescriptors.resize(count);
@@ -152,13 +167,6 @@ void AccelerationStructure::SetMeshes(const MeshDescriptor* meshes, int meshCoun
 {
     _meshDescriptors.resize(meshCount);
     memcpy(_meshDescriptors.data(), meshes, meshCount * sizeof(MeshDescriptor));
-    _accelerationStructureDirty = true;
-}
-
-void AccelerationStructure::SetInstances(const InstanceDescriptor *instances, int count)
-{
-    _instanceDescriptors.resize(count);
-    memcpy(_instanceDescriptors.data(), instances, count * sizeof(InstanceDescriptor));
     _accelerationStructureDirty = true;
 }
 
@@ -254,7 +262,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     // The renderer builds this structure to match the ray-traced scene structure so the
     // ray-tracing shader navigates it. In particular, Metal represents each submesh as a
     // geometry in the primitive acceleration structure.
-    NSUInteger instanceArgumentSize = sizeof( struct Instance ) * _instanceDescriptors.size();
+    NSUInteger instanceArgumentSize = sizeof( struct AAPLInstance ) * _instanceDescriptors.size();
     id<MTLBuffer> instanceArgumentBuffer = newBufferWithLabel(@"instanceArgumentBuffer",
                                                              instanceArgumentSize,
                                                              storageMode);
@@ -262,7 +270,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     // Encode the instances array in `Scene` (`Scene::instances`).
     for ( NSUInteger i = 0; i < _instanceDescriptors.size(); ++i )
     {
-        struct Instance* pInstance = ((struct Instance *)instanceArgumentBuffer.contents) + i;
+        struct AAPLInstance* pInstance = ((struct AAPLInstance *)instanceArgumentBuffer.contents) + i;
         pInstance->meshIndex = _instanceDescriptors[i].meshIndex;
         pInstance->materialIndex = _instanceDescriptors[i].materialIndex;
         pInstance->transform = MatrixFromFloatPointer(_instanceDescriptors[i].transformMatrix);
@@ -272,7 +280,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     [instanceArgumentBuffer didModifyRange:NSMakeRange(0, instanceArgumentBuffer.length)];
 #endif
 
-    NSUInteger meshArgumentSize = sizeof( struct Mesh ) * _meshDescriptors.size();
+    NSUInteger meshArgumentSize = sizeof( struct AAPLMesh ) * _meshDescriptors.size();
     id<MTLBuffer> meshArgumentBuffer = newBufferWithLabel(@"meshArgumentBuffer",
                                                              meshArgumentSize,
                                                              storageMode);
@@ -281,7 +289,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     for ( NSUInteger i = 0; i < _meshDescriptors.size(); ++i )
     {
         MeshDescriptor mesh = _meshDescriptors[i];
-        struct Mesh* pMesh = ((struct Mesh *)meshArgumentBuffer.contents) + i;
+        struct AAPLMesh* pMesh = ((struct AAPLMesh *)meshArgumentBuffer.contents) + i;
 
         id<MTLBuffer> positionBuffer = (__bridge id<MTLBuffer>)mesh.positionBuffer;
         id<MTLBuffer> genericBuffer = (__bridge id<MTLBuffer>)mesh.genericBuffer;
@@ -299,13 +307,13 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         // Build submeshes into a buffer and reference it through a pointer in the mesh.
     }
     
-    NSUInteger materialArgumentSize = sizeof( struct Mesh ) * _materialDescriptors.size();
+    NSUInteger materialArgumentSize = sizeof( struct AAPLMesh ) * _materialDescriptors.size();
     id<MTLBuffer> materialArgumentBuffer = newBufferWithLabel(@"materialArgumentBuffer",
                                                               materialArgumentSize,
                                                              storageMode);
     for ( NSUInteger i = 0; i < _materialDescriptors.size(); ++i )
     {
-        struct Material* pMaterial = ((struct Material *)materialArgumentBuffer.contents) + i;
+        struct AAPLMaterial* pMaterial = ((struct AAPLMaterial *)materialArgumentBuffer.contents) + i;
         id<MTLTexture> baseMap = (__bridge id<MTLTexture>)_materialDescriptors[i].BaseMap;
         id<MTLTexture> normalMap = (__bridge id<MTLTexture>)_materialDescriptors[i].NormalMap;
         id<MTLTexture> maskMap = (__bridge id<MTLTexture>)_materialDescriptors[i].MaskMap;
@@ -322,13 +330,13 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
                                                            storageMode);
 
     // Set `Scene::instances`.
-    ((struct Scene *)sceneArgumentBuffer.contents)->instances = instanceArgumentBuffer.gpuAddress;
+    ((struct AAPLScene *)sceneArgumentBuffer.contents)->instances = instanceArgumentBuffer.gpuAddress;
 
     // Set `Scene::meshes`.
-    ((struct Scene *)sceneArgumentBuffer.contents)->meshes = meshArgumentBuffer.gpuAddress;
+    ((struct AAPLScene *)sceneArgumentBuffer.contents)->meshes = meshArgumentBuffer.gpuAddress;
 
     // Set `Scene::materials`.
-    ((struct Scene *)sceneArgumentBuffer.contents)->materials = materialArgumentBuffer.gpuAddress;
+    ((struct AAPLScene *)sceneArgumentBuffer.contents)->materials = materialArgumentBuffer.gpuAddress;
 
 #if TARGET_MACOS
     [instanceArgumentBuffer didModifyRange:NSMakeRange(0, instanceArgumentBuffer.length)];
@@ -355,20 +363,27 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
 
     id<MTLComputeCommandEncoder> compEnc = [commandBuffer computeCommandEncoder];
     compEnc.label = @"RaytracedReflectionsComputeEncoder";
-    [compEnc setTexture:rtReflectionMap atIndex:OutImageIndex];
-    [compEnc setTexture:depthTexture atIndex:GBufferDepthIndex];
-    [compEnc setTexture:normalTexture atIndex:GBufferNormalIndex];
+    [compEnc setTexture:rtReflectionMap atIndex:AAPLRaytracingOutImageIndex];
+    [compEnc setTexture:depthTexture atIndex:AAPLRaytracingGBufferDepthIndex];
+    [compEnc setTexture:normalTexture atIndex:AAPLRaytracingGBufferNormalIndex];
 
     // Bind the root of the argument buffer for the scene.
 //    [compEnc setBuffer:_sceneArgumentBuffer offset:0 atIndex:SceneIndex];
 
+    _constantBufferIndex = ( _constantBufferIndex + 1 ) % kMaxBuffersInFlight;
     // Update Projection Matrix
-    _cameraBufferIndex = ( _cameraBufferIndex + 1 ) % kMaxBuffersInFlight;
-    AAPLCameraData* pCameraData = (AAPLCameraData *)_cameraDataBuffers[_cameraBufferIndex].contents;
+    AAPLCameraData* pCameraData = (AAPLCameraData *)_cameraDataBuffers[_constantBufferIndex].contents;
     pCameraData->MatrixVP = MatrixFromFloatPointer(cameraData.worldToClip);
     pCameraData->MatrixVP_Inv = MatrixFromFloatPointer(cameraData.clipToWorld);
     pCameraData->cameraPosition = vector_float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
-    [compEnc setBuffer:_cameraDataBuffers[_cameraBufferIndex] offset:0 atIndex:AAPLBufferIndexCameraData];
+    [compEnc setBuffer:_cameraDataBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexCameraData];
+
+    // Update Light Data
+    AAPLLightData* pLightData = (AAPLLightData *)_lightDataBuffers[_constantBufferIndex].contents;
+    pLightData->lightCount = static_cast<uint32_t>(_lightDescriptors.size());
+    static_assert(sizeof(AAPLLightStruct) == sizeof(LightDescriptor), "LightDescriptor and AAPLLightStruct must be the same size");
+    memcpy(pLightData->lights, _lightDescriptors.data(), sizeof(AAPLLightStruct) * _lightDescriptors.size());
+    [compEnc setBuffer:_lightDataBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexLightData];
 
     [compEnc setBuffer:_sceneArgumentBuffer offset:0 atIndex:AAPLBufferIndexScene];
 

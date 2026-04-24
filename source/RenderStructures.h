@@ -7,6 +7,14 @@ struct InstanceDescriptor
     float transformMatrix[16];
 };
 
+struct LightDescriptor
+{
+    float attenuation[4];
+    float color[4];
+    float direction[4];
+    float position[4];
+};
+
 struct MeshDescriptor
 {
     void* positionBuffer;

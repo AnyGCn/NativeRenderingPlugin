@@ -166,6 +166,16 @@ bool RenderAPI_Metal::SupportRaytracing()
         return false;
 }
 
+void RenderAPI_Metal::SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetInstances(pInstances, count);
+}
+
+void RenderAPI_Metal::SetRaytracingLights(const LightDescriptor* pLights, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetLights(pLights, count);
+}
+
 void RenderAPI_Metal::SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
     m_accelerationStructure->SetMaterials(pMaterials, count);
@@ -174,11 +184,6 @@ void RenderAPI_Metal::SetRaytracingMaterials(const MaterialDscriptor* pMaterials
 void RenderAPI_Metal::SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
     m_accelerationStructure->SetMeshes(pMeshes, count);
-}
-
-void RenderAPI_Metal::SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
-{
-    m_accelerationStructure->SetInstances(pInstances, count);
 }
 
 void RenderAPI_Metal::DispatchRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))
