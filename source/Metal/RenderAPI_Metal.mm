@@ -2,6 +2,7 @@
 
 #if SUPPORT_METAL
 
+#include "ShaderDefinition.h"
 #include "RenderAPI_Metal.h"
 
 RenderAPI* CreateRenderAPI_Metal()
@@ -171,11 +172,6 @@ void RenderAPI_Metal::SetRaytracingInstances(const InstanceDescriptor* pInstance
     m_accelerationStructure->SetInstances(pInstances, count);
 }
 
-void RenderAPI_Metal::SetRaytracingLights(const LightDescriptor* pLights, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
-{
-    m_accelerationStructure->SetLights(pLights, count);
-}
-
 void RenderAPI_Metal::SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
     m_accelerationStructure->SetMaterials(pMaterials, count);
@@ -186,15 +182,24 @@ void RenderAPI_Metal::SetRaytracingMeshes(const MeshDescriptor* pMeshes, int cou
     m_accelerationStructure->SetMeshes(pMeshes, count);
 }
 
+void RenderAPI_Metal::SetRaytracingRenderParameters(const RaytracingRenderParameters& lightData) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetRenderParameters(lightData);
+}
+
 void RenderAPI_Metal::DispatchRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))
 {
-    id<MTLTexture> depth = (__bridge id<MTLTexture>)m_Textures[eDepth];
-    id<MTLTexture> normal = (__bridge id<MTLTexture>)m_Textures[eNormal];
-    id<MTLTexture> output = (__bridge id<MTLTexture>)m_Textures[eRaytracingOutput];
     id<MTLCommandBuffer> commandBuffer = m_MetalGraphics->CurrentCommandBuffer();
     if (commandBuffer == nil) return;
+    __unsafe_unretained id<MTLTexture> textures[AAPLRaytracingTextureCount];
+    textures[AAPLRaytracingOutImageIndex] = (__bridge id<MTLTexture>)m_Textures[eRaytracingOutput];
+    textures[AAPLRaytracingGBufferDepthIndex] = (__bridge id<MTLTexture>)m_Textures[eDepth];
+    textures[AAPLRaytracingGBufferNormalIndex] = (__bridge id<MTLTexture>)m_Textures[eNormal];
+    textures[AAPLRaytracingGBufferMaskIndex] = (__bridge id<MTLTexture>)m_Textures[eGBufferMask];
+    textures[AAPLRaytracingMainLightShadowMap] = (__bridge id<MTLTexture>)m_Textures[eMainLightShadowMap];
+    textures[AAPLRaytracingSkyCubeMap] = (__bridge id<MTLTexture>)m_Textures[eSkyCube];
     m_MetalGraphics->EndCurrentCommandEncoder();
-    m_accelerationStructure->DispatchRaytracing(commandBuffer, m_CameraData, output, depth, normal);
+    m_accelerationStructure->DispatchRaytracing(commandBuffer, m_CameraData, textures);
 }
 
 void RenderAPI_Metal::CleanupRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))

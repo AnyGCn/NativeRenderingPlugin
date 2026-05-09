@@ -9,7 +9,10 @@ typedef enum AAPLRTReflectionKernelImageIndex
     AAPLRaytracingOutImageIndex                 = 0,
     AAPLRaytracingGBufferDepthIndex             = 1,
     AAPLRaytracingGBufferNormalIndex            = 2,
-    AAPLRaytracingGBufferMaskIndex              = 3
+    AAPLRaytracingGBufferMaskIndex              = 3,
+    AAPLRaytracingMainLightShadowMap            = 4,
+    AAPLRaytracingSkyCubeMap                    = 5,
+    AAPLRaytracingTextureCount,
 } RTReflectionKernelImageIndex;
 
 typedef enum AAPLTextureIndex
@@ -25,8 +28,7 @@ typedef enum AAPLRTReflectionKernelBufferIndex
 {
     AAPLBufferIndexScene,
     AAPLBufferIndexAccelerationStructure,
-    AAPLBufferIndexCameraData,
-    AAPLBufferIndexLightData,
+    AAPLBufferIndexRenderParameter,
 } AAPLRTReflectionKernelBufferIndex;
 
 typedef struct AAPLCameraData
@@ -166,6 +168,7 @@ struct AAPLMaterial
     float _BumpScale;
     float _Metallic;
     float _Roughness;
+    float _Occlusion;
 };
 
 struct AAPLScene
@@ -176,13 +179,42 @@ struct AAPLScene
     constant AAPLMaterial* materials    [[ id( AAPLArgumentBufferIDSceneMaterials ) ]];
 };
 
-struct AAPLLightData
+struct AAPLRenderParameter
 {
+    // Camera data
+    float4x4 MatrixVP;
+    float4x4 MatrixVP_Inv;
+    float4 cameraPosition;
+    
+    AAPLLightStruct lights[AAPL_MAX_LIGHTS_COUNT];
+    // Shadow map
+    float4x4 shadowMatrix[5];
+    float4 shadowSplitSphere0;
+    float4 shadowSplitSphere1;
+    float4 shadowSplitSphere2;
+    float4 shadowSplitSphere3;
+    float4 shadowBorder;
+    float4 shadowMapSize;
+    float4 shadowParams;
+
+    // Sky light
+    float4 unity_SHAr;
+    float4 unity_SHAg;
+    float4 unity_SHAb;
+    float4 unity_SHBr;
+    float4 unity_SHBg;
+    float4 unity_SHBb;
+    float4 unity_SHC;
+    
+    float4 skyCubeHDRDecodeValues;
+    
     uint32_t lightCount;
-    array<AAPLLightStruct, AAPL_MAX_LIGHTS_COUNT> lights;
+    uint32_t hasMainLightShadow;
 };
 
 #else
+
+#import <Metal/Metal.h>
 
 struct AAPLInstance
 {
@@ -214,6 +246,12 @@ struct AAPLMesh
 struct AAPLMaterial
 {
     MTLResourceID textures[AAPLMaterialTextureCount];
+    simd_float4 _BaseColor;
+    simd_float4 _Emission;
+    float _BumpScale;
+    float _Metallic;
+    float _Roughness;
+    float _Occlusion;
 };
 
 struct AAPLScene
@@ -222,12 +260,6 @@ struct AAPLScene
     uint64_t instances;
     uint64_t meshes;
     uint64_t materials;
-};
-
-struct AAPLLightData
-{
-    uint32_t lightCount;
-    AAPLLightStruct lights[AAPL_MAX_LIGHTS_COUNT];
 };
 
 #endif

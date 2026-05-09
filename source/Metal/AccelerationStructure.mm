@@ -34,6 +34,11 @@ static inline matrix_float4x4 MatrixFromFloatPointer(const float* m)
     };
 }
 
+static inline simd_float4 VectorFromFloatPointer(const float* v)
+{
+    return simd_make_float4(v[0], v[1], v[2], v[3]);
+}
+
 MTLPackedFloat4x3 matrix4x4_drop_last_row(matrix_float4x4 m)
 {
     return (MTLPackedFloat4x3){
@@ -81,12 +86,9 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
 
     for (int i = 0; i < kMaxBuffersInFlight; i++)
     {
-        _cameraDataBuffers[i] = [_device newBufferWithLength:sizeof(AAPLCameraData)
-                                                 options:MTLResourceStorageModeShared];
-        _cameraDataBuffers[i].label = [NSString stringWithFormat:@"CameraDataBuffer %d", i];
-        _lightDataBuffers[i] = [_device newBufferWithLength:sizeof(AAPLLightData)
-                                                 options:MTLResourceStorageModeShared];
-        _lightDataBuffers[i].label = [NSString stringWithFormat:@"LightDataBuffer %d", i];
+        _renderParametersBuffers[i] = [_device newBufferWithLength:sizeof(RaytracingRenderParameters)
+                                         options:MTLResourceStorageModeShared];
+        _renderParametersBuffers[i].label = [NSString stringWithFormat:@"RenderParametersBuffer %d", i];
     }
 
     _accelerationStructureBuildEvent = [_device newEvent];
@@ -151,12 +153,6 @@ void AccelerationStructure::SetInstances(const InstanceDescriptor *instances, in
     _accelerationStructureDirty = true;
 }
 
-void AccelerationStructure::SetLights(const LightDescriptor *lights, int count)
-{
-    _lightDescriptors.resize(count);
-    memcpy(_lightDescriptors.data(), lights, count * sizeof(LightDescriptor));
-}
-
 void AccelerationStructure::SetMaterials(const MaterialDscriptor *materials, int count)
 {
     _materialDescriptors.resize(count);
@@ -168,6 +164,14 @@ void AccelerationStructure::SetMeshes(const MeshDescriptor* meshes, int meshCoun
     _meshDescriptors.resize(meshCount);
     memcpy(_meshDescriptors.data(), meshes, meshCount * sizeof(MeshDescriptor));
     _accelerationStructureDirty = true;
+}
+
+void AccelerationStructure::SetRenderParameters(const RaytracingRenderParameters& lightData)
+{
+    _constantBufferIndex = ( _constantBufferIndex + 1 ) % kMaxBuffersInFlight;
+    // Update Projection Matrix
+    RaytracingRenderParameters* pRenderParam = (RaytracingRenderParameters *)_renderParametersBuffers[_constantBufferIndex].contents;
+    *pRenderParam = lightData;
 }
 
 void AccelerationStructure::BuildBottomLevelAccelerationStructure(id<MTLCommandBuffer> cmd)
@@ -320,6 +324,12 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         pMaterial->textures[AAPLTextureIndexBaseColor] = baseMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexNormal] = normalMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexMask] = maskMap.gpuResourceID;
+        pMaterial->_BaseColor = VectorFromFloatPointer(_materialDescriptors[i].BaseColor);
+        pMaterial->_Emission = VectorFromFloatPointer(_materialDescriptors[i].Emission);
+        pMaterial->_BumpScale = _materialDescriptors[i].BumpScale;
+        pMaterial->_Metallic = _materialDescriptors[i].Metallic;
+        pMaterial->_Roughness = _materialDescriptors[i].Roughness;
+        pMaterial->_Occlusion = _materialDescriptors[i].Occlusion;
         [_sceneResources addObject:baseMap];
         [_sceneResources addObject:normalMap];
         [_sceneResources addObject:maskMap];
@@ -348,7 +358,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     _sceneArgumentBuffer = sceneArgumentBuffer;
 }
 
-void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, const CameraData& cameraData, id<MTLTexture> rtReflectionMap, id<MTLTexture> depthTexture, id<MTLTexture> normalTexture)
+void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, const CameraData& cameraData, id<MTLTexture> __unsafe_unretained * textures)
 {
     if (_accelerationStructureDirty)
     {
@@ -363,28 +373,15 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
 
     id<MTLComputeCommandEncoder> compEnc = [commandBuffer computeCommandEncoder];
     compEnc.label = @"RaytracedReflectionsComputeEncoder";
-    [compEnc setTexture:rtReflectionMap atIndex:AAPLRaytracingOutImageIndex];
-    [compEnc setTexture:depthTexture atIndex:AAPLRaytracingGBufferDepthIndex];
-    [compEnc setTexture:normalTexture atIndex:AAPLRaytracingGBufferNormalIndex];
+    [compEnc setTexture:textures[AAPLRaytracingOutImageIndex] atIndex:AAPLRaytracingOutImageIndex];
+    [compEnc setTexture:textures[AAPLRaytracingGBufferDepthIndex] atIndex:AAPLRaytracingGBufferDepthIndex];
+    [compEnc setTexture:textures[AAPLRaytracingGBufferNormalIndex] atIndex:AAPLRaytracingGBufferNormalIndex];
+    [compEnc setTexture:textures[AAPLRaytracingGBufferMaskIndex] atIndex:AAPLRaytracingGBufferMaskIndex];
+    [compEnc setTexture:textures[AAPLRaytracingMainLightShadowMap] atIndex:AAPLRaytracingMainLightShadowMap];
+    [compEnc setTexture:textures[AAPLRaytracingSkyCubeMap] atIndex:AAPLRaytracingSkyCubeMap];
+    [compEnc setBuffer: _renderParametersBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexRenderParameter];
 
     // Bind the root of the argument buffer for the scene.
-//    [compEnc setBuffer:_sceneArgumentBuffer offset:0 atIndex:SceneIndex];
-
-    _constantBufferIndex = ( _constantBufferIndex + 1 ) % kMaxBuffersInFlight;
-    // Update Projection Matrix
-    AAPLCameraData* pCameraData = (AAPLCameraData *)_cameraDataBuffers[_constantBufferIndex].contents;
-    pCameraData->MatrixVP = MatrixFromFloatPointer(cameraData.worldToClip);
-    pCameraData->MatrixVP_Inv = MatrixFromFloatPointer(cameraData.clipToWorld);
-    pCameraData->cameraPosition = vector_float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
-    [compEnc setBuffer:_cameraDataBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexCameraData];
-
-    // Update Light Data
-    AAPLLightData* pLightData = (AAPLLightData *)_lightDataBuffers[_constantBufferIndex].contents;
-    pLightData->lightCount = static_cast<uint32_t>(_lightDescriptors.size());
-    static_assert(sizeof(AAPLLightStruct) == sizeof(LightDescriptor), "LightDescriptor and AAPLLightStruct must be the same size");
-    memcpy(pLightData->lights, _lightDescriptors.data(), sizeof(AAPLLightStruct) * _lightDescriptors.size());
-    [compEnc setBuffer:_lightDataBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexLightData];
-
     [compEnc setBuffer:_sceneArgumentBuffer offset:0 atIndex:AAPLBufferIndexScene];
 
     // Bind the prebuilt acceleration structure.
@@ -411,7 +408,7 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
     NSUInteger w = _rtReflectionPipeline.threadExecutionWidth;
     NSUInteger h = _rtReflectionPipeline.maxTotalThreadsPerThreadgroup / w;
     MTLSize threadsPerThreadgroup = MTLSizeMake( w, h, 1 );
-    MTLSize threadsPerGrid = MTLSizeMake(rtReflectionMap.width, rtReflectionMap.height, 1);
+    MTLSize threadsPerGrid = MTLSizeMake(textures[AAPLRaytracingOutImageIndex].width, textures[AAPLRaytracingOutImageIndex].height, 1);
 
     [compEnc dispatchThreads:threadsPerGrid threadsPerThreadgroup:threadsPerThreadgroup];
 
@@ -431,4 +428,3 @@ void AccelerationStructure::CleanupRaytracing()
     // Clear C++ containers
     _instanceDescriptors.clear();
 }
-

@@ -20,6 +20,7 @@ EXPORTS
    SetRaytracingMaterials
    SetRaytracingMeshes
    SetRaytracingInstances
+   SetRaytracingRenderParameters
    SupportDLSS
    SupportDLSS_FG
    SetDLSSOptions

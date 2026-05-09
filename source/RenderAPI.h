@@ -40,9 +40,9 @@ public:
     virtual void UpscaleTextureMetalFXTemporal() {}
     virtual void CleanupMetalFX() {}
     virtual void SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) {}
-    virtual void SetRaytracingLights(const LightDescriptor* pLights, int count) {}
     virtual void SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) {}
     virtual void SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count) {}
+    virtual void SetRaytracingRenderParameters(const RaytracingRenderParameters& lightData) {}
     virtual bool SupportRaytracing() { return false; }
     virtual void DispatchRaytracing() {}
     virtual void CleanupRaytracing() {}

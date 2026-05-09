@@ -208,11 +208,6 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingInstance
     s_CurrentAPI->SetRaytracingInstances(pInstances, count);
 }
 
-extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingLights(const LightDescriptor* pLights, int count)
-{
-    s_CurrentAPI->SetRaytracingLights(pLights, count);
-}
-
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count)
 {
     s_CurrentAPI->SetRaytracingMaterials(pMaterials, count);
@@ -221,6 +216,11 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingMaterial
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count)
 {
     s_CurrentAPI->SetRaytracingMeshes(pMeshes, count);
+}
+
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingRenderParameters(const RaytracingRenderParameters* pLightData)
+{
+    s_CurrentAPI->SetRaytracingRenderParameters(*pLightData);
 }
 
 extern "C" bool UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SupportDLSS()

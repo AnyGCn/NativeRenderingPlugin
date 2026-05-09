@@ -15,6 +15,48 @@ struct LightDescriptor
     float position[4];
 };
 
+#define MAX_LIGHTS_COUNT 32
+
+struct RaytracingRenderParameters
+{
+    // Warning: aligned of float4
+    // Camera Data
+    float MatrixVP[16];
+    float MatrixVP_Inv[16];
+    float cameraPosition[4];
+
+    // Light Data
+    LightDescriptor lights[MAX_LIGHTS_COUNT];
+
+    // Main light shadow data
+    float shadowMatrix0[16];
+    float shadowMatrix1[16];
+    float shadowMatrix2[16];
+    float shadowMatrix3[16];
+    float shadowMatrix4[16];
+    float shadowSplitSphere0[4];
+    float shadowSplitSphere1[4];
+    float shadowSplitSphere2[4];
+    float shadowSplitSphere3[4];
+    float shadowBorder[4];
+    float shadowMapSize[4];
+    float shadowParams[4];
+
+    // Sky light
+    float unity_SHAr[4];
+    float unity_SHAg[4];
+    float unity_SHAb[4];
+    float unity_SHBr[4];
+    float unity_SHBg[4];
+    float unity_SHBb[4];
+    float unity_SHC[4];
+    
+    float skyCubeHDRDecodeValues[4];
+    
+    int lightCount;
+    int hasMainLightShadow;
+};
+
 struct MeshDescriptor
 {
     void* positionBuffer;
@@ -31,6 +73,12 @@ struct MaterialDscriptor
     void* BaseMap;
     void* NormalMap;
     void* MaskMap;
+    float BaseColor[4];
+    float Emission[4];
+    float BumpScale;
+    float Metallic;
+    float Roughness;
+    float Occlusion;
 };
 
 struct CameraData
@@ -126,7 +174,10 @@ enum TextureType
     eScalingInputColor,
     eScalingOutputColor,
     eNormal,
+    eGBufferMask,
     eRaytracingOutput,
+    eMainLightShadowMap,
+    eSkyCube,
     eTextureTypeCount,
 };
 
