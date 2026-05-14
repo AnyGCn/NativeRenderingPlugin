@@ -64,12 +64,6 @@ typedef enum AAPLArgumentBufferID
 
 typedef enum AAPLVerexFlagMask
 {
-    AAPLVertexFlagBitPositionStride = 0,
-    AAPLVertexFlagBitGenericStride  = 8,
-    AAPLVertexFlagBitGenericOffset  = 16,
-    AAPLVertexFlagMaskPositionStride = 0xFF,
-    AAPLVertexFlagMaskGenericStride = 0xFF00,
-    AAPLVertexFlagMaskGenericOffset = 0xFF0000,
     AAPLVertexFlagMaskIndexHalf = 0x1000000,
     AAPLVertexFlagMaskPositionHalf = 0x2000000,
     AAPLVertexFlagMaskNormalHalf = 0x4000000,
@@ -77,21 +71,6 @@ typedef enum AAPLVerexFlagMask
     AAPLVertexFlagMaskColorExists = 0x10000000,
     AAPLVertexFlagMaskUVHalf = 0x20000000
 } AAPLVerexParameterFlags;
-
-inline uint32_t GetPositionStride(uint32_t vertexParameters)
-{
-    return (vertexParameters & AAPLVertexFlagMaskPositionStride) >> AAPLVertexFlagBitPositionStride;
-}
-
-inline uint32_t GetGenericStride(uint32_t vertexParameters)
-{
-    return (vertexParameters & AAPLVertexFlagMaskGenericStride) >> AAPLVertexFlagBitGenericStride;
-}
-
-inline uint32_t GetGenericOffset(uint32_t vertexParameters)
-{
-    return (vertexParameters & AAPLVertexFlagMaskGenericOffset) >> AAPLVertexFlagBitGenericOffset;
-}
 
 inline bool IsIndexHalf(uint32_t vertexParameters)
 {
@@ -131,13 +110,15 @@ using namespace metal;
 struct AAPLInstance
 {
     // A reference to a single mesh in the meshes array stored in structure `Scene`.
-    uint32_t meshIndex [[id(0)]];
+    uint32_t meshIndex;
 
     //constant Mesh* pMesh [[ id( AAPLArgmentBufferIDInstanceMesh ) ]];
-    uint32_t materialIndex [[id(1)]];
+    uint32_t materialIndex;
+    uint32_t padding0;
+    uint32_t padding1;
 
     // The location of the mesh for this instance.
-    float4x4 transform [[id(2)]];
+    float4x4 transform;
 };
 
 struct AAPLMesh
@@ -152,12 +133,15 @@ struct AAPLMesh
     // tangent half flag 1 bit
     // color exists flag 1 bit
     // uv half flag 1 bit
-    uint32_t vertexParameters   [[ id(0) ]];
+    uint32_t positionStride;
+    uint32_t genericStride;
+    uint32_t genericOffset;
+    uint32_t vertexParameters;
     // Support 4 submesh mostly.
 //    uint4    subMeshIndexOffset [[ id(1) ]];
-    constant uint8_t* positions [[ id( AAPLArgumentBufferIDMeshPositions ) ]];
-    constant uint8_t* generics  [[ id( AAPLArgumentBufferIDMeshGenerics  ) ]];
-    constant uint8_t* indices   [[ id( AAPLArgumentBufferIDMeshIndices   ) ]];
+    constant uint8_t* positions;
+    constant uint8_t* generics;
+    constant uint8_t* indices;
 };
 
 struct AAPLMaterial
@@ -220,6 +204,8 @@ struct AAPLInstance
 {
     uint32_t meshIndex;
     uint32_t materialIndex;
+    uint32_t padding0;
+    uint32_t padding1;
     matrix_float4x4 transform;
 };
 
@@ -235,6 +221,9 @@ struct AAPLMesh
     // position stride 8 bit
     // generic stride 8 bit
     // generic offset 8 bit
+    uint32_t positionStride;
+    uint32_t genericStride;
+    uint32_t genericOffset;
     uint32_t vertexParameters;
     // Support 4 submesh mostly.
 //    uint4    subMeshIndexOffset     [[ id(1) ]];

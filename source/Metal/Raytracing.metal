@@ -3,6 +3,10 @@
 
 #include "Lighting.h"
 
+// Include the header that this Metal shader code shares with the Swift/C code that executes Metal API commands.
+using namespace metal;
+using raytracing::instance_acceleration_structure;
+
 float3x4 LoadVertexDataDimension2(constant uint8_t* pData, uint32_t i0, uint32_t i1, uint32_t i2, uint32_t stride, bool isHalf)
 {
     float3x4 dataArray;
@@ -81,16 +85,16 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
     Varyings vertexOutput = {};
 
     // Position
-    uint32_t stride = GetPositionStride(mesh.vertexParameters);
+    uint32_t stride = mesh.positionStride;
     bool isHalf = IsPositionHalf(mesh.vertexParameters);
     float3x4 dataArray = LoadVertexDataDimension3(mesh.positions, i0, i1, i2, stride, isHalf);
     vertexOutput.worldPosition = (instance.transform * (dataArray * bary3)).xyz;
 
     // Generics
-    constant uint8_t* pGenerics = mesh.generics + GetGenericOffset(mesh.vertexParameters);
+    constant uint8_t* pGenerics = mesh.generics + mesh.genericOffset;
 
     // Normal
-    stride = GetGenericStride(mesh.vertexParameters);
+    stride = mesh.genericStride;
     isHalf = IsNormalHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension3(pGenerics, i0, i1, i2, stride, isHalf);
     vertexOutput.normal = half4(dataArray * bary3).xyz;
@@ -120,10 +124,6 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
 
     return vertexOutput;
 }
-
-// Include the header that this Metal shader code shares with the Swift/C code that executes Metal API commands.
-using namespace metal;
-using raytracing::instance_acceleration_structure;
 
 kernel void rtReflection(
              texture2d< half, access::write >       outImage                [[texture(AAPLRaytracingOutImageIndex)]],
@@ -181,7 +181,7 @@ kernel void rtReflection(
                 constant AAPLMaterial& material = pScene->materials[instance.materialIndex];
                 Varyings vertexOutput = LoadVertexData(intersection.primitive_id, bary3, instance, mesh);
 
-                float3 cameraPosition = r.origin;
+//                float3 cameraPosition = r.origin;
                 vertexOutput.worldPosition = r.origin + r.direction * intersection.distance;
                 MaterialParameter matData = InitializeMaterialData(vertexOutput, material);
                 normalWS = float3(matData.normalWS);

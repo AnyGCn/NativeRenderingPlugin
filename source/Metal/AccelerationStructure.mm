@@ -188,7 +188,7 @@ void AccelerationStructure::BuildBottomLevelAccelerationStructure(id<MTLCommandB
             g.vertexBuffer = (__bridge id<MTLBuffer>)mesh.positionBuffer;
             g.vertexBufferOffset = 0;
             g.vertexFormat = IsPositionHalf(mesh.vertexParameter) ? MTLAttributeFormatHalf4 : MTLAttributeFormatFloat3;
-            g.vertexStride = GetPositionStride(mesh.vertexParameter);
+            g.vertexStride = mesh.positionStride;
 
             g.indexBuffer = (__bridge id<MTLBuffer>)mesh.indexBuffer;
             g.indexBufferOffset = mesh.indexBufferOffset;
@@ -303,7 +303,10 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         pMesh->generics = genericBuffer.gpuAddress;
         pMesh->indices = indexBuffer.gpuAddress + mesh.indexBufferOffset;
         pMesh->vertexParameters = mesh.vertexParameter;
-
+        pMesh->positionStride = mesh.positionStride;
+        pMesh->genericStride = mesh.genericStride;
+        pMesh->genericOffset = mesh.genericOffset;
+        
         [_sceneResources addObject:positionBuffer];
         [_sceneResources addObject:genericBuffer];
         [_sceneResources addObject:indexBuffer];
@@ -311,7 +314,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         // Build submeshes into a buffer and reference it through a pointer in the mesh.
     }
     
-    NSUInteger materialArgumentSize = sizeof( struct AAPLMesh ) * _materialDescriptors.size();
+    NSUInteger materialArgumentSize = sizeof( struct AAPLMaterial ) * _materialDescriptors.size();
     id<MTLBuffer> materialArgumentBuffer = newBufferWithLabel(@"materialArgumentBuffer",
                                                               materialArgumentSize,
                                                              storageMode);
@@ -321,9 +324,11 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         id<MTLTexture> baseMap = (__bridge id<MTLTexture>)_materialDescriptors[i].BaseMap;
         id<MTLTexture> normalMap = (__bridge id<MTLTexture>)_materialDescriptors[i].NormalMap;
         id<MTLTexture> maskMap = (__bridge id<MTLTexture>)_materialDescriptors[i].MaskMap;
+        id<MTLTexture> emissionMap = (__bridge id<MTLTexture>)_materialDescriptors[i].EmissionMap;
         pMaterial->textures[AAPLTextureIndexBaseColor] = baseMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexNormal] = normalMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexMask] = maskMap.gpuResourceID;
+        pMaterial->textures[AAPLTextureIndexEmission] = emissionMap.gpuResourceID;
         pMaterial->_BaseColor = VectorFromFloatPointer(_materialDescriptors[i].BaseColor);
         pMaterial->_Emission = VectorFromFloatPointer(_materialDescriptors[i].Emission);
         pMaterial->_BumpScale = _materialDescriptors[i].BumpScale;
@@ -333,6 +338,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         [_sceneResources addObject:baseMap];
         [_sceneResources addObject:normalMap];
         [_sceneResources addObject:maskMap];
+        [_sceneResources addObject:emissionMap];
     }
 
     id<MTLBuffer> sceneArgumentBuffer = newBufferWithLabel(@"sceneArgumentBuffer",
@@ -424,7 +430,11 @@ void AccelerationStructure::CleanupRaytracing()
 
     // Release argument buffer
     _sceneArgumentBuffer = nil;
+    [_sceneResources removeAllObjects];
+    [_sceneHeaps removeAllObjects];
 
     // Clear C++ containers
     _instanceDescriptors.clear();
+    _materialDescriptors.clear();
+    _meshDescriptors.clear();
 }

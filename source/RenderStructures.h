@@ -64,6 +64,9 @@ struct MeshDescriptor
     void* indexBuffer;
 
     int vertexParameter;
+    int positionStride;
+    int genericStride;
+    int genericOffset;
     int indexBufferOffset;
     int indexCount;
 };
@@ -73,6 +76,7 @@ struct MaterialDscriptor
     void* BaseMap;
     void* NormalMap;
     void* MaskMap;
+    void* EmissionMap;
     float BaseColor[4];
     float Emission[4];
     float BumpScale;

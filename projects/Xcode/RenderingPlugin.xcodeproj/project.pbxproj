@@ -44,6 +44,7 @@
 		87BB9C262F9226970093534D /* RenderAPI_Metal.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = RenderAPI_Metal.mm; sourceTree = "<group>"; };
 		87BB9C2D2F92371E0093534D /* Raytracing.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Raytracing.metal; sourceTree = "<group>"; };
 		87BB9C302F9255D20093534D /* ShaderDefinition.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ShaderDefinition.h; sourceTree = "<group>"; };
+		87CD20712FB57DD000F2047A /* Lighting.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Lighting.h; sourceTree = "<group>"; };
 		8D576316048677EA00EA77CD /* RenderingPlugin.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RenderingPlugin.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D576317048677EA00EA77CD /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -145,6 +146,7 @@
 		87BB9C272F9226970093534D /* Metal */ = {
 			isa = PBXGroup;
 			children = (
+				87CD20712FB57DD000F2047A /* Lighting.h */,
 				87BB9C302F9255D20093534D /* ShaderDefinition.h */,
 				87BB9C2D2F92371E0093534D /* Raytracing.metal */,
 				87BB9C232F9226970093534D /* AccelerationStructure.h */,

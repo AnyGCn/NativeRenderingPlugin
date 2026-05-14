@@ -25,14 +25,12 @@ void RenderAPI_Metal::CreateResources()
 
 RenderAPI_Metal::RenderAPI_Metal()
 {
-    if (@available(iOS 17.0, macOS 14.0, *))
-        m_accelerationStructure = new AccelerationStructure();
+
 }
 
 RenderAPI_Metal::~RenderAPI_Metal()
 {
-    if (@available(iOS 17.0, macOS 14.0, *))
-        delete m_accelerationStructure;
+
 }
 
 void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInterfaces* interfaces)
@@ -43,12 +41,21 @@ void RenderAPI_Metal::ProcessDeviceEvent(UnityGfxDeviceEventType type, IUnityInt
         MTLFXSpatialScalerDescriptorClass = NSClassFromString(@"MTLFXSpatialScalerDescriptor");
         MTLFXTemporalScalerDescriptorClass = NSClassFromString(@"MTLFXTemporalScalerDescriptor");
         if (@available(iOS 17.0, macOS 14.0, *))
+        {
+            m_accelerationStructure = new AccelerationStructure();
             m_accelerationStructure->Initialize(m_MetalGraphics->MetalDevice());
+        }
+
         CreateResources();
     }
     else if (type == kUnityGfxDeviceEventShutdown)
     {
         //@TODO: release resources
+        if (@available(iOS 17.0, macOS 14.0, *))
+        {
+            m_accelerationStructure->CleanupRaytracing();
+            delete m_accelerationStructure;
+        }
     }
 }
 
