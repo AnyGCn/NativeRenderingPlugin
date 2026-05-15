@@ -4,6 +4,12 @@
 
 #define AAPL_MAX_LIGHTS_COUNT 32
 
+typedef enum AAPLRaytracingMask
+{
+    AAPLRaytracingMaskNormal = 0x1,
+    AAPLRaytracingMaskShadow = 0x2,
+} AAPLRaytracingMask;
+
 typedef enum AAPLRTReflectionKernelImageIndex
 {
     AAPLRaytracingOutImageIndex                 = 0,
@@ -13,7 +19,7 @@ typedef enum AAPLRTReflectionKernelImageIndex
     AAPLRaytracingMainLightShadowMap            = 4,
     AAPLRaytracingSkyCubeMap                    = 5,
     AAPLRaytracingTextureCount,
-} RTReflectionKernelImageIndex;
+} AAPLRTReflectionKernelImageIndex;
 
 typedef enum AAPLTextureIndex
 {
@@ -28,6 +34,7 @@ typedef enum AAPLRTReflectionKernelBufferIndex
 {
     AAPLBufferIndexScene,
     AAPLBufferIndexAccelerationStructure,
+    AAPLBufferIndexIntersectionFunctionTable,
     AAPLBufferIndexRenderParameter,
 } AAPLRTReflectionKernelBufferIndex;
 
@@ -40,6 +47,7 @@ typedef struct AAPLCameraData
     float roughnessBias;
 } AAPLCameraData;
 
+// Keep sync with LightDescriptor in RenderStructures.h
 typedef struct AAPLLightStruct
 {
     // Per Light Properties
@@ -64,6 +72,14 @@ typedef enum AAPLArgumentBufferID
 
 typedef enum AAPLVerexFlagMask
 {
+    AAPLVertexFlagBitPositionStride = 0,
+    AAPLVertexFlagBitGenericStride  = 8,
+    AAPLVertexFlagMaskPositionStride = 0xFF,
+    AAPLVertexFlagMaskGenericStride = 0xFF00,
+    AAPLVertexFlagMaskNormalInGeneric = 0x10000,
+    AAPLVertexFlagMaskTangentInGeneric = 0x20000,
+    AAPLVertexFlagMaskColorInGeneric = 0x40000,
+    AAPLVertexFlagMaskUVInGeneric = 0x80000,
     AAPLVertexFlagMaskIndexHalf = 0x1000000,
     AAPLVertexFlagMaskPositionHalf = 0x2000000,
     AAPLVertexFlagMaskNormalHalf = 0x4000000,
@@ -71,6 +87,36 @@ typedef enum AAPLVerexFlagMask
     AAPLVertexFlagMaskColorExists = 0x10000000,
     AAPLVertexFlagMaskUVHalf = 0x20000000
 } AAPLVerexParameterFlags;
+
+inline uint32_t GetPositionStride(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskPositionStride) >> AAPLVertexFlagBitPositionStride;
+}
+
+inline uint32_t GetGenericStride(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskGenericStride) >> AAPLVertexFlagBitGenericStride;
+}
+
+inline bool IsNormalInGeneric(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskNormalInGeneric) != 0;
+}
+
+inline bool IsTangentInGeneric(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskTangentInGeneric) != 0;
+}
+
+inline bool IsColorInGeneric(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskColorInGeneric) != 0;
+}
+
+inline bool IsUVInGeneric(uint32_t vertexParameters)
+{
+    return (vertexParameters & AAPLVertexFlagMaskUVInGeneric) != 0;
+}
 
 inline bool IsIndexHalf(uint32_t vertexParameters)
 {
@@ -107,15 +153,14 @@ inline bool IsUVHalf(uint32_t vertexParameters)
 #include <metal_stdlib>
 using namespace metal;
 
+// Keep sync with AAPLInstance in RenderStructures.h
 struct AAPLInstance
 {
     // A reference to a single mesh in the meshes array stored in structure `Scene`.
     uint32_t meshIndex;
-
-    //constant Mesh* pMesh [[ id( AAPLArgmentBufferIDInstanceMesh ) ]];
     uint32_t materialIndex;
-    uint32_t padding0;
-    uint32_t padding1;
+    uint32_t renderFlag;
+    uint32_t padding;
 
     // The location of the mesh for this instance.
     float4x4 transform;
@@ -123,25 +168,11 @@ struct AAPLInstance
 
 struct AAPLMesh
 {
-    // The arrays of vertices.
-    // position stride 8 bit
-    // generic stride 8 bit
-    // generic offset 8 bit
-    // index half flag 1 bit
-    // position half flag 1 bit
-    // normal half flag 1 bit
-    // tangent half flag 1 bit
-    // color exists flag 1 bit
-    // uv half flag 1 bit
-    uint32_t positionStride;
-    uint32_t genericStride;
-    uint32_t genericOffset;
-    uint32_t vertexParameters;
-    // Support 4 submesh mostly.
-//    uint4    subMeshIndexOffset [[ id(1) ]];
     constant uint8_t* positions;
     constant uint8_t* generics;
     constant uint8_t* indices;
+    uint32_t vertexParameters;
+    uint32_t padding;
 };
 
 struct AAPLMaterial
@@ -163,6 +194,7 @@ struct AAPLScene
     constant AAPLMaterial* materials    [[ id( AAPLArgumentBufferIDSceneMaterials ) ]];
 };
 
+// Keep sync with RaytracingRenderParameters in RenderStructures.h
 struct AAPLRenderParameter
 {
     // Camera data
@@ -199,15 +231,6 @@ struct AAPLRenderParameter
 #else
 
 #import <Metal/Metal.h>
-
-struct AAPLInstance
-{
-    uint32_t meshIndex;
-    uint32_t materialIndex;
-    uint32_t padding0;
-    uint32_t padding1;
-    matrix_float4x4 transform;
-};
 
 struct AAPLMesh
 {

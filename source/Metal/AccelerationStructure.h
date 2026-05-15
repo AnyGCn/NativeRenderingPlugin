@@ -30,7 +30,7 @@ class API_AVAILABLE(ios(17.0), macos(14.0)) AccelerationStructure
     id<MTLBuffer> _renderParametersBuffers[kMaxBuffersInFlight];
 
     id<MTLDevice> _device;
-    id<MTLFunction> _rtReflectionFunction;
+    id<MTLIntersectionFunctionTable> _intersectionFunctionTable;
     id<MTLComputePipelineState> _rtReflectionPipeline;
 
     id<MTLEvent> _accelerationStructureBuildEvent;

@@ -25,13 +25,42 @@ struct int2
     int x, y;
 };
 
+enum ShadowCastingMode
+{
+    ShadowCastingOff = 0,
+    ShadowCastingOn = 1,
+    ShadowCastingTwoSided = 2,
+    ShadowCastingShadowsOnly = 3,
+};
+
+enum CullMode
+{
+    CullNone = 0,
+    CullFront = 1,
+    CullBack = 2,
+};
+
+enum RaytracingInstanceFlagMask
+{
+    RTInstBitOpaque = 0,
+    RTInstBitCullMode = 1,
+    RTInstBitShadowCastingMode = 3,
+    RTInstMaskOpaque = 0b0001,
+    RTInstMaskCullMode = 0b0110,
+    RTInstMaskShadowCastingMode = 0b011000,
+};
+
+// Keep sync with AAPLInstance in Metal/ShaderDefinition.h
 struct InstanceDescriptor
 {
     int materialIndex;
     int meshIndex;
+    int renderFlag;
+    int padding;
     float4x4 transformMatrix;
 };
 
+// Keep sync with AAPLLightStruct in Metal/ShaderDefinition.h
 struct LightDescriptor
 {
     float4 attenuation;
@@ -42,6 +71,7 @@ struct LightDescriptor
 
 #define MAX_LIGHTS_COUNT 32
 
+// Keep sync with AAPLRenderParameter in Metal/ShaderDefinition.h
 struct RaytracingRenderParameters
 {
     // Warning: aligned of float4

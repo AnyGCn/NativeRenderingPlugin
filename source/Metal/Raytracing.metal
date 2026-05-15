@@ -5,7 +5,10 @@
 
 // Include the header that this Metal shader code shares with the Swift/C code that executes Metal API commands.
 using namespace metal;
+using raytracing::instancing;
 using raytracing::instance_acceleration_structure;
+using raytracing::intersection_function_table;
+using raytracing::triangle_data;
 
 float3x4 LoadVertexDataDimension2(constant uint8_t* pData, uint32_t i0, uint32_t i1, uint32_t i2, uint32_t stride, bool isHalf)
 {
@@ -83,29 +86,36 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
     }
 
     Varyings vertexOutput = {};
+    constant uint8_t* pPositions = mesh.positions;
+    constant uint8_t* pGenerics = mesh.generics;
+    uint32_t positionStride = GetPositionStride(mesh.vertexParameters);
+    uint32_t genericStride = GetGenericStride(mesh.vertexParameters);
 
     // Position
-    uint32_t stride = mesh.positionStride;
+    uint32_t stride = positionStride;
     bool isHalf = IsPositionHalf(mesh.vertexParameters);
-    float3x4 dataArray = LoadVertexDataDimension3(mesh.positions, i0, i1, i2, stride, isHalf);
+    float3x4 dataArray = LoadVertexDataDimension3(pPositions, i0, i1, i2, stride, isHalf);
     vertexOutput.worldPosition = (instance.transform * (dataArray * bary3)).xyz;
-
-    // Generics
-    constant uint8_t* pGenerics = mesh.generics + mesh.genericOffset;
+    pPositions += isHalf ? 8 : 12;
 
     // Normal
-    stride = mesh.genericStride;
+    bool isGeneric = IsNormalInGeneric(mesh.vertexParameters);
+    stride = isGeneric ? genericStride : positionStride;
     isHalf = IsNormalHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension3(pGenerics, i0, i1, i2, stride, isHalf);
     vertexOutput.normal = half4(dataArray * bary3).xyz;
-    pGenerics += isHalf ? 8 : 12;
+    pPositions += isGeneric ? 0 : (isHalf ? 8 : 12);
+    pGenerics += isGeneric ? (isHalf ? 8 : 12) : 0;
 
     // Tangent
+    isGeneric = IsTangentInGeneric(mesh.vertexParameters);
+    stride = isGeneric ? genericStride : positionStride;
     isHalf = IsTangentHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension4(pGenerics, i0, i1, i2, stride, isHalf);
     float4 tangentW = dataArray * bary3;
     vertexOutput.tangent = half4(tangentW).xyz;
-    pGenerics += isHalf ? 8 : 16;
+    pPositions += isGeneric ? 0 : (isHalf ? 8 : 12);
+    pGenerics += isGeneric ? (isHalf ? 8 : 12) : 0;
 
     // Bitangent
     float4x4 mv = instance.transform;
@@ -115,14 +125,55 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
     vertexOutput.bitangent = cross(vertexOutput.normal, vertexOutput.tangent) * sign(tangentW.w);
 
     // Color
-    pGenerics += IsColorExists(mesh.vertexParameters) ? 4 : 0;
+    isGeneric = IsColorInGeneric(mesh.vertexParameters);
+    bool isColorExists = IsColorExists(mesh.vertexParameters);
+    pPositions += isGeneric ? 0 : (isColorExists ? 4 : 0);
+    pGenerics += isGeneric ? (isColorExists ? 4 : 0) : 0;
 
     // Texture coordinates (maybe memory access out of bounds)
+    isGeneric = IsUVInGeneric(mesh.vertexParameters);
+    stride = isGeneric ? genericStride : positionStride;
     isHalf = IsUVHalf(mesh.vertexParameters);
     dataArray = LoadVertexDataDimension2(pGenerics, i0, i1, i2, stride, isHalf);
     vertexOutput.texCoord = (dataArray * bary3).xy;
 
     return vertexOutput;
+}
+
+half MainLightShadowUsingRaytracing(instance_acceleration_structure accelerationStructure, intersection_function_table<instancing, triangle_data> functionTable, float3 worldPos, float3 lightDir)
+{
+    raytracing::ray r;
+    r.origin = worldPos;
+    r.direction = lightDir;
+    r.min_distance = 0.1;
+    r.max_distance = FLT_MAX;
+    
+    raytracing::intersector<raytracing::instancing, raytracing::triangle_data> inter;
+    inter.force_opacity( raytracing::forced_opacity::opaque );
+    inter.assume_geometry_type( raytracing::geometry_type::triangle );
+    auto intersection = inter.intersect( r, accelerationStructure, AAPLRaytracingMaskShadow, functionTable );
+    return intersection.type == raytracing::intersection_type::triangle ? 0.0 : 1.0;
+}
+
+[[intersection(triangle, instancing, triangle_data)]]
+bool alphaTestIntersection(
+    // 自动注入的内联参数
+    uint primitive_id                      [[primitive_id]],
+    uint instance_id                       [[instance_id]],
+    float2 barycentric_coords              [[barycentric_coord]],
+    // 开发者传入的自定义资源场景数据
+    constant AAPLScene* pScene             [[buffer(AAPLBufferIndexScene)]]
+)
+{
+    constant AAPLInstance& instance = pScene->instances[ instance_id ];
+    constant AAPLMesh& mesh = pScene->meshes[instance.meshIndex];
+    constant AAPLMaterial& material = pScene->materials[instance.materialIndex];
+    float2 bary2 = barycentric_coords;
+    float3 bary3 = float3( 1.0 - (bary2.x + bary2.y), bary2.x, bary2.y );
+    Varyings vertexOutput = LoadVertexData(primitive_id, bary3, instance, mesh);
+    MaterialParameter matData = InitializeMaterialData(vertexOutput, material);
+    float alphaCutoff = 0.5;
+    return (matData.alpha >= alphaCutoff);
 }
 
 kernel void rtReflection(
@@ -135,11 +186,11 @@ kernel void rtReflection(
              constant AAPLRenderParameter&          renderData              [[buffer(AAPLBufferIndexRenderParameter)]],
              constant AAPLScene*                    pScene                  [[buffer(AAPLBufferIndexScene)]],
              instance_acceleration_structure        accelerationStructure   [[buffer(AAPLBufferIndexAccelerationStructure)]],
+             intersection_function_table<instancing, triangle_data> functionTable [[buffer(AAPLBufferIndexIntersectionFunctionTable)]],
              uint2 tid [[thread_position_in_grid]])
 {
-    uint w = outImage.get_width();
-    uint h = outImage.get_height();
-    if ( tid.x < w && tid.y < h )
+    uint2 outputSize = uint2(outImage.get_width(), outImage.get_height());
+    if (all(tid < outputSize))
     {
         half4 finalColor = half4( 0.0, 0.0, 0.0, 1.0 );
         if (is_null_instance_acceleration_structure(accelerationStructure))
@@ -149,16 +200,18 @@ kernel void rtReflection(
         else
         {
             // Reconstruct world-space position from depth
-            float depth01 = depth.read(tid).x;                     // depth in [0,1] clip space
-            float2 uv = (float2(tid) + 0.5f) / float2(w, h);       // pixel center -> [0,1]
-            float ndcZ = depth01;                                  // to NDC z
-            float4 clipPos = float4(uv * 2.0f - 1.0f, ndcZ, 1.0f); // NDC xy,z
+            uint2 inputSize = uint2(depth.get_width(), depth.get_height());
+            uint2 inputCoord = tid * inputSize / outputSize;
+            float2 uv = (float2(inputCoord) + 0.5f) / float2(inputSize); // pixel center -> [0,1]
+            float depth01 = depth.read(inputCoord).x;                    // depth in [0,1] clip space
+            float ndcZ = depth01;                                        // to NDC z
+            float4 clipPos = float4(uv * 2.0f - 1.0f, ndcZ, 1.0f);       // NDC xy,z
             clipPos.y = -clipPos.y;
             float4 worldPosH = renderData.MatrixVP_Inv * clipPos;  // homogeneous world
             float3 worldPos = worldPosH.xyz / worldPosH.w;
 
             // Decode oct-encoded normal from the normal map
-            float3 normalWS = UnpackOctNormal(normalMap.read(tid).xyz);
+            float3 normalWS = UnpackOctNormal(normalMap.read(inputCoord).xyz);
             float3 viewDir = normalize(renderData.cameraPosition.xyz - worldPos);
             float3 reflectDir = reflect(-viewDir, normalWS);
 
@@ -168,9 +221,10 @@ kernel void rtReflection(
             r.min_distance = 0.1;
             r.max_distance = FLT_MAX;
 
-            raytracing::intersector<raytracing::instancing, raytracing::triangle_data> inter;
+            raytracing::intersector<instancing, triangle_data> inter;
+            inter.force_opacity( raytracing::forced_opacity::opaque );
             inter.assume_geometry_type( raytracing::geometry_type::triangle );
-            auto intersection = inter.intersect( r, accelerationStructure, 0xFF );
+            auto intersection = inter.intersect( r, accelerationStructure, AAPLRaytracingMaskNormal, functionTable );
             if ( intersection.type == raytracing::intersection_type::triangle )
             {
                 float2 bary2 = intersection.triangle_barycentric_coord;
@@ -203,7 +257,7 @@ kernel void rtReflection(
                 if (renderData.lightCount > 0)
                 {
                     LightParameter lightParam = GetLightParameter(renderData.lights[0], vertexOutput.worldPosition);
-                    lightParam.shadowAttenuation = renderData.hasMainLightShadow ? MainLightShadow(renderData, mainlightShadowMap, vertexOutput.worldPosition) : 1.0;
+                    lightParam.shadowAttenuation = renderData.hasMainLightShadow ? MainLightShadowUsingRaytracing(accelerationStructure, functionTable, vertexOutput.worldPosition, float3(lightParam.direction)) : 1.0;
                     finalColor.xyz += BRDFDataToLightingResult(matData, lightParam, half3(viewDir));
                 }
 

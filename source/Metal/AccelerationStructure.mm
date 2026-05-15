@@ -23,23 +23,7 @@ void arrayToBatchMethodHelper(NSArray *array, void (^callback)(__unsafe_unretain
 #undef bufferLength
 }
 
-// 将一个指向 16 个 float 的指针转换成 matrix_float4x4（按列主序填充）
-static inline matrix_float4x4 MatrixFromFloatPointer(const float* m)
-{
-    return (matrix_float4x4){
-        (simd_float4){ m[0],  m[1],  m[2],  m[3]  },
-        (simd_float4){ m[4],  m[5],  m[6],  m[7]  },
-        (simd_float4){ m[8],  m[9],  m[10], m[11] },
-        (simd_float4){ m[12], m[13], m[14], m[15] }
-    };
-}
-
-static inline simd_float4 VectorFromFloatPointer(const float* v)
-{
-    return simd_make_float4(v[0], v[1], v[2], v[3]);
-}
-
-MTLPackedFloat4x3 matrix4x4_drop_last_row(matrix_float4x4 m)
+MTLPackedFloat4x3 matrix4x4_drop_last_row(const float4x4 m)
 {
     return (MTLPackedFloat4x3){
         MTLPackedFloat3Make( m.columns[0].x, m.columns[0].y, m.columns[0].z ),
@@ -70,19 +54,37 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
         return;
     }
 
-    _rtReflectionFunction = [defaultLibrary newFunctionWithName:@"rtReflection"];
-    if (_rtReflectionFunction == nil)
+    id<MTLFunction> rtReflectionFunction = [defaultLibrary newFunctionWithName:@"rtReflection"];
+    if (rtReflectionFunction == nil)
     {
         RenderAPI::LogError("Failed to load default metallib from plugin bundle: %s", error.localizedDescription.UTF8String);
         return;
     }
 
-    _rtReflectionPipeline = [_device newComputePipelineStateWithFunction:_rtReflectionFunction error:&error];
+    MTLIntersectionFunctionDescriptor *intersectionDesc = [[MTLIntersectionFunctionDescriptor alloc] init];
+    intersectionDesc.name = @"rayIntersection";
+    id<MTLFunction> rtAnyHitFunction = [defaultLibrary newIntersectionFunctionWithDescriptor:intersectionDesc error:&error];
+    MTLLinkedFunctions *linkedFunctions = [[MTLLinkedFunctions alloc] init];
+    linkedFunctions.functions = @[ rtAnyHitFunction ]; // 注册 Any-Hit 函数
+
+    MTLComputePipelineDescriptor *pipelineDesc = [[MTLComputePipelineDescriptor alloc] init];
+    pipelineDesc.computeFunction = rtReflectionFunction;
+    pipelineDesc.linkedFunctions = linkedFunctions;
+    
+    _rtReflectionPipeline = [_device newComputePipelineStateWithDescriptor:pipelineDesc options:MTLPipelineOptionNone reflection:nil error:&error];
     if (error)
     {
         RenderAPI::LogError("Failed to create RT reflection compute pipeline state: %s", error.localizedDescription.UTF8String);
         return;
     }
+
+    // 1. 配置函数表描述符
+    MTLIntersectionFunctionTableDescriptor *tableDesc = [MTLIntersectionFunctionTableDescriptor intersectionFunctionTableDescriptor];
+    tableDesc.functionCount = 1; // 假设场景中只有 1 个需要应用 Alpha 裁剪的几何体类型
+    
+    // 2. 让管线生成与之兼容的函数表
+    _intersectionFunctionTable = [_rtReflectionPipeline newIntersectionFunctionTableWithDescriptor:tableDesc];
+    [_intersectionFunctionTable setFunction:[_rtReflectionPipeline functionHandleWithFunction:rtAnyHitFunction] atIndex:0];
 
     for (int i = 0; i < kMaxBuffersInFlight; i++)
     {
@@ -214,6 +216,32 @@ void AccelerationStructure::BuildBottomLevelAccelerationStructure(id<MTLCommandB
     [_sceneHeaps addObject:_accelerationStructureHeap];
 }
 
+const static MTLAccelerationStructureInstanceOptions cullingOptions[] =
+{
+    MTLAccelerationStructureInstanceOptionDisableTriangleCulling,
+    MTLAccelerationStructureInstanceOptionTriangleFrontFacingWindingCounterClockwise,
+    MTLAccelerationStructureInstanceOptionNone,
+};
+
+const static uint32_t shadowCastingMask[] =
+{
+    AAPLRaytracingMaskNormal,
+    AAPLRaytracingMaskNormal | AAPLRaytracingMaskShadow,
+    AAPLRaytracingMaskNormal | AAPLRaytracingMaskShadow,
+    AAPLRaytracingMaskShadow,
+};
+
+inline uint32_t GetRaytracingMask(uint32_t renderFlag)
+{
+    return shadowCastingMask[(renderFlag & RTInstMaskShadowCastingMode) >> RTInstBitShadowCastingMode];
+}
+
+inline MTLAccelerationStructureInstanceOptions GetRaytracingOptions(uint32_t renderFlag)
+{
+    return cullingOptions[(renderFlag & RTInstMaskCullMode) >> RTInstBitCullMode] |
+    (renderFlag & RTInstBitOpaque ? MTLAccelerationStructureInstanceOptionOpaque : MTLAccelerationStructureInstanceOptionNonOpaque);
+}
+
 void AccelerationStructure::BuildTopLevelAccelerationStructure(id<MTLCommandBuffer> cmd)
 {
     MTLInstanceAccelerationStructureDescriptor* instanceAccelStructureDesc = [MTLInstanceAccelerationStructureDescriptor descriptor];
@@ -225,16 +253,16 @@ void AccelerationStructure::BuildTopLevelAccelerationStructure(id<MTLCommandBuff
     // Load instance data (two fire trucks + one sphere + floor):
     size_t bufferLength = sizeof(MTLAccelerationStructureInstanceDescriptor) * instanceCount;
     id<MTLBuffer> instanceDescriptorBuffer = [_device newBufferWithLength:bufferLength options:MTLResourceStorageModeShared];
-    MTLAccelerationStructureInstanceDescriptor* instanceDescriptors = (MTLAccelerationStructureInstanceDescriptor *)instanceDescriptorBuffer.contents;
+    MTLAccelerationStructureInstanceDescriptor* accelInstanceDescs = (MTLAccelerationStructureInstanceDescriptor *)instanceDescriptorBuffer.contents;
     for (NSUInteger i = 0; i < _instanceDescriptors.size(); ++i)
     {
-        instanceDescriptors[i].accelerationStructureIndex = _instanceDescriptors[i].meshIndex;
-        instanceDescriptors[i].intersectionFunctionTableOffset = 0;
-        instanceDescriptors[i].mask = 0xFF;
-        instanceDescriptors[i].options = MTLAccelerationStructureInstanceOptionNone;
-
-        MTLPackedFloat4x3 transformationMatrix{};
-        instanceDescriptors[i].transformationMatrix = matrix4x4_drop_last_row(MatrixFromFloatPointer(_instanceDescriptors[i].transformMatrix));
+        
+        const InstanceDescriptor& instance = _instanceDescriptors[i];
+        accelInstanceDescs[i].accelerationStructureIndex = instance.meshIndex;
+        accelInstanceDescs[i].intersectionFunctionTableOffset = 0;
+        accelInstanceDescs[i].mask = GetRaytracingMask(instance.renderFlag);
+        accelInstanceDescs[i].options |= GetRaytracingOptions(instance.renderFlag);
+        accelInstanceDescs[i].transformationMatrix = matrix4x4_drop_last_row(instance.transformMatrix);
     }
 
     instanceAccelStructureDesc.instanceDescriptorBuffer = instanceDescriptorBuffer;
@@ -266,23 +294,11 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     // The renderer builds this structure to match the ray-traced scene structure so the
     // ray-tracing shader navigates it. In particular, Metal represents each submesh as a
     // geometry in the primitive acceleration structure.
-    NSUInteger instanceArgumentSize = sizeof( struct AAPLInstance ) * _instanceDescriptors.size();
+    NSUInteger instanceArgumentSize = sizeof( struct InstanceDescriptor ) * _instanceDescriptors.size();
     id<MTLBuffer> instanceArgumentBuffer = newBufferWithLabel(@"instanceArgumentBuffer",
                                                              instanceArgumentSize,
                                                              storageMode);
-
-    // Encode the instances array in `Scene` (`Scene::instances`).
-    for ( NSUInteger i = 0; i < _instanceDescriptors.size(); ++i )
-    {
-        struct AAPLInstance* pInstance = ((struct AAPLInstance *)instanceArgumentBuffer.contents) + i;
-        pInstance->meshIndex = _instanceDescriptors[i].meshIndex;
-        pInstance->materialIndex = _instanceDescriptors[i].materialIndex;
-        pInstance->transform = MatrixFromFloatPointer(_instanceDescriptors[i].transformMatrix);
-    }
-
-#if TARGET_MACOS
-    [instanceArgumentBuffer didModifyRange:NSMakeRange(0, instanceArgumentBuffer.length)];
-#endif
+    memcpy(instanceArgumentBuffer.contents, _instanceDescriptors.data(), instanceArgumentSize);
 
     NSUInteger meshArgumentSize = sizeof( struct AAPLMesh ) * _meshDescriptors.size();
     id<MTLBuffer> meshArgumentBuffer = newBufferWithLabel(@"meshArgumentBuffer",
@@ -329,8 +345,8 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         pMaterial->textures[AAPLTextureIndexNormal] = normalMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexMask] = maskMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexEmission] = emissionMap.gpuResourceID;
-        pMaterial->_BaseColor = VectorFromFloatPointer(_materialDescriptors[i].BaseColor);
-        pMaterial->_Emission = VectorFromFloatPointer(_materialDescriptors[i].Emission);
+        pMaterial->_BaseColor = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].BaseColor);
+        pMaterial->_Emission = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].Emission);
         pMaterial->_BumpScale = _materialDescriptors[i].BumpScale;
         pMaterial->_Metallic = _materialDescriptors[i].Metallic;
         pMaterial->_Roughness = _materialDescriptors[i].Roughness;
@@ -392,6 +408,7 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
 
     // Bind the prebuilt acceleration structure.
     [compEnc setAccelerationStructure:_instanceAccelerationStructure atBufferIndex:AAPLBufferIndexAccelerationStructure];
+    [compEnc setIntersectionFunctionTable:_intersectionFunctionTable atBufferIndex:AAPLBufferIndexIntersectionFunctionTable];
 
     // Set the ray tracing reflection kernel.
     [compEnc setComputePipelineState:_rtReflectionPipeline];
