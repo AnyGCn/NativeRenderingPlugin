@@ -144,10 +144,10 @@ void RenderAPI_Metal::UpscaleTextureMetalFXTemporal() API_AVAILABLE(ios(16.0), m
     m_temporalScaler.motionTexture = motion;
     m_temporalScaler.outputTexture = output;
     m_temporalScaler.reset |= m_CameraData.reset;
-    m_temporalScaler.jitterOffsetX = m_CameraData.jitterOffset[0];
-    m_temporalScaler.jitterOffsetY = m_CameraData.jitterOffset[1];
-    m_temporalScaler.motionVectorScaleX = m_CameraData.mvecScale[0] * m_temporalScaler.inputWidth;
-    m_temporalScaler.motionVectorScaleY = m_CameraData.mvecScale[1] * m_temporalScaler.inputHeight;
+    m_temporalScaler.jitterOffsetX = m_CameraData.jitterOffset.x;
+    m_temporalScaler.jitterOffsetY = m_CameraData.jitterOffset.y;
+    m_temporalScaler.motionVectorScaleX = m_CameraData.mvecScale.x * m_temporalScaler.inputWidth;
+    m_temporalScaler.motionVectorScaleY = m_CameraData.mvecScale.y * m_temporalScaler.inputHeight;
     
     [m_temporalScaler encodeToCommandBuffer:commandBuffer];
 }
@@ -206,7 +206,7 @@ void RenderAPI_Metal::DispatchRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0)
     textures[AAPLRaytracingMainLightShadowMap] = (__bridge id<MTLTexture>)m_Textures[eMainLightShadowMap];
     textures[AAPLRaytracingSkyCubeMap] = (__bridge id<MTLTexture>)m_Textures[eSkyCube];
     m_MetalGraphics->EndCurrentCommandEncoder();
-    m_accelerationStructure->DispatchRaytracing(commandBuffer, m_CameraData, textures);
+    m_accelerationStructure->DispatchRaytracing(commandBuffer, textures);
 }
 
 void RenderAPI_Metal::CleanupRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0))

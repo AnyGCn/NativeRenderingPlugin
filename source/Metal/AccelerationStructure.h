@@ -65,7 +65,7 @@ public:
     void BuildBottomLevelAccelerationStructure(id<MTLCommandBuffer> cmd);
     void BuildTopLevelAccelerationStructure(id<MTLCommandBuffer> cmd);
     void BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd);
-    void DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, const CameraData& cameraData, id<MTLTexture> __unsafe_unretained * textures);
+    void DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, id<MTLTexture> __unsafe_unretained * textures);
     void CleanupRaytracing();
     bool IsSupported() { return _initialized; }
 };

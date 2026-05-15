@@ -34,10 +34,10 @@ void RenderAPI_D3D::UpscaleTextureDLSS(void* context) const
 {
     sl::DLSSOptions dlssOptions;
     dlssOptions.mode = static_cast<sl::DLSSMode>(m_dlss_mode);
-    dlssOptions.outputWidth = m_CameraData.outputSize[0];
-    dlssOptions.outputHeight = m_CameraData.outputSize[1];
-    dlssOptions.alphaUpscalingEnabled = m_CameraData.alphaUpscalingEnabled ? sl::Boolean::eTrue : sl::Boolean::eFalse;
-    dlssOptions.colorBuffersHDR = m_CameraData.colorBuffersHDR ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    dlssOptions.outputWidth = m_CameraData.outputSize.x;
+    dlssOptions.outputHeight = m_CameraData.outputSize.y;
+    dlssOptions.alphaUpscalingEnabled = sl::Boolean(m_CameraData.alphaUpscalingEnabled);
+    dlssOptions.colorBuffersHDR = sl::Boolean(m_CameraData.colorBuffersHDR);
     SLWrapper::Get().SetViewportHandle(m_CameraData.viewHandle);
     SLWrapper::Get().SetSLConsts(m_CameraData);
     SLWrapper::Get().SetDLSSOptions(dlssOptions);

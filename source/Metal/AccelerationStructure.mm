@@ -364,7 +364,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
     _sceneArgumentBuffer = sceneArgumentBuffer;
 }
 
-void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, const CameraData& cameraData, id<MTLTexture> __unsafe_unretained * textures)
+void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffer, id<MTLTexture> __unsafe_unretained * textures)
 {
     if (_accelerationStructureDirty)
     {

@@ -320,34 +320,34 @@ void SLWrapper::SetSLConsts(const CameraData& cameraData)
     }
 
     // 初始化RenderSurfaceSettings
-    m_renderSizeX = cameraData.inputSize[0];
-    m_renderSizeY = cameraData.inputSize[1];
-    m_outputSizeX = cameraData.outputSize[0];
-    m_outputSizeY = cameraData.outputSize[1];
-    
+    m_renderSizeX = cameraData.inputSize.x;
+    m_renderSizeY = cameraData.inputSize.y;
+    m_outputSizeX = cameraData.outputSize.x;
+    m_outputSizeY = cameraData.outputSize.y;
+
     // 初始化sl::Constants
     sl::Constants slConstants{};
-    slConstants.cameraViewToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.cameraViewToClip);
-    slConstants.clipToCameraView = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToCameraView);
+    slConstants.cameraViewToClip = *reinterpret_cast<const sl::float4x4*>(&cameraData.cameraViewToClip);
+    slConstants.clipToCameraView = *reinterpret_cast<const sl::float4x4*>(&cameraData.clipToCameraView);
     slConstants.clipToLensClip = sl::float4x4{};
-    slConstants.clipToPrevClip = *reinterpret_cast<const sl::float4x4*>(cameraData.clipToPrevClip);
-    slConstants.prevClipToClip = *reinterpret_cast<const sl::float4x4*>(cameraData.prevClipToClip);
-    slConstants.jitterOffset = sl::float2{ cameraData.jitterOffset[0], cameraData.jitterOffset[1] };
-    slConstants.mvecScale = sl::float2{ cameraData.mvecScale[0], cameraData.mvecScale[1] };
+    slConstants.clipToPrevClip = *reinterpret_cast<const sl::float4x4*>(&cameraData.clipToPrevClip);
+    slConstants.prevClipToClip = *reinterpret_cast<const sl::float4x4*>(&cameraData.prevClipToClip);
+    slConstants.jitterOffset = *reinterpret_cast<const sl::float2*>(&cameraData.jitterOffset);
+    slConstants.mvecScale = *reinterpret_cast<const sl::float2*>(&cameraData.mvecScale);
     slConstants.cameraPinholeOffset = sl::float2{ 0, 0 };
-    slConstants.cameraPos = sl::float3{ cameraData.cameraPos[0], cameraData.cameraPos[1], cameraData.cameraPos[2] };
-    slConstants.cameraUp = sl::float3{ cameraData.cameraUp[0], cameraData.cameraUp[1], cameraData.cameraUp[2] };
-    slConstants.cameraRight = sl::float3{ cameraData.cameraRight[0], cameraData.cameraRight[1], cameraData.cameraRight[2] };
-    slConstants.cameraFwd = sl::float3{ cameraData.cameraFwd[0], cameraData.cameraFwd[1], cameraData.cameraFwd[2] };
+    slConstants.cameraPos = *reinterpret_cast<const sl::float3*>(&cameraData.cameraPos);
+    slConstants.cameraUp = *reinterpret_cast<const sl::float3*>(&cameraData.cameraUp);
+    slConstants.cameraRight = *reinterpret_cast<const sl::float3*>(&cameraData.cameraRight);
+    slConstants.cameraFwd = *reinterpret_cast<const sl::float3*>(&cameraData.cameraFwd);
     slConstants.cameraNear = cameraData.cameraNear;
     slConstants.cameraFar = cameraData.cameraFar;
     slConstants.cameraFOV = cameraData.cameraFOV;
-    slConstants.cameraAspectRatio = 1.0f * cameraData.outputSize[0] / static_cast<float>(cameraData.outputSize[1]);
+    slConstants.cameraAspectRatio = 1.0f * cameraData.outputSize.x / cameraData.outputSize.y;
     slConstants.motionVectorsInvalidValue = 0.0f;
-    slConstants.depthInverted = cameraData.depthInverted ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.depthInverted = sl::Boolean(cameraData.depthInverted);
     slConstants.cameraMotionIncluded = sl::Boolean::eTrue;
     slConstants.motionVectors3D = sl::Boolean::eFalse;
-    slConstants.reset = cameraData.reset ? sl::Boolean::eTrue : sl::Boolean::eFalse;
+    slConstants.reset = sl::Boolean(cameraData.reset);
     slConstants.orthographicProjection = sl::Boolean::eFalse;
     slConstants.motionVectorsDilated = sl::Boolean::eFalse;
     slConstants.motionVectorsJittered = sl::Boolean::eFalse;

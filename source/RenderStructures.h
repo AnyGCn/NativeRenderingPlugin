@@ -1,18 +1,43 @@
 #pragma once
 
+struct float2
+{
+    float x, y;
+};
+
+struct float3
+{
+    float x, y, z;
+};
+
+struct float4
+{
+    float x, y, z, w;
+};
+
+struct float4x4
+{
+    float4 columns[4];
+};
+
+struct int2
+{
+    int x, y;
+};
+
 struct InstanceDescriptor
 {
     int materialIndex;
     int meshIndex;
-    float transformMatrix[16];
+    float4x4 transformMatrix;
 };
 
 struct LightDescriptor
 {
-    float attenuation[4];
-    float color[4];
-    float direction[4];
-    float position[4];
+    float4 attenuation;
+    float4 color;
+    float4 direction;
+    float4 position;
 };
 
 #define MAX_LIGHTS_COUNT 32
@@ -21,37 +46,37 @@ struct RaytracingRenderParameters
 {
     // Warning: aligned of float4
     // Camera Data
-    float MatrixVP[16];
-    float MatrixVP_Inv[16];
-    float cameraPosition[4];
+    float4x4 MatrixVP;
+    float4x4 MatrixVP_Inv;
+    float4 cameraPosition;
 
     // Light Data
     LightDescriptor lights[MAX_LIGHTS_COUNT];
 
     // Main light shadow data
-    float shadowMatrix0[16];
-    float shadowMatrix1[16];
-    float shadowMatrix2[16];
-    float shadowMatrix3[16];
-    float shadowMatrix4[16];
-    float shadowSplitSphere0[4];
-    float shadowSplitSphere1[4];
-    float shadowSplitSphere2[4];
-    float shadowSplitSphere3[4];
-    float shadowBorder[4];
-    float shadowMapSize[4];
-    float shadowParams[4];
+    float4x4 shadowMatrix0;
+    float4x4 shadowMatrix1;
+    float4x4 shadowMatrix2;
+    float4x4 shadowMatrix3;
+    float4x4 shadowMatrix4;
+    float4 shadowSplitSphere0;
+    float4 shadowSplitSphere1;
+    float4 shadowSplitSphere2;
+    float4 shadowSplitSphere3;
+    float4 shadowBorder;
+    float4 shadowMapSize;
+    float4 shadowParams;
 
     // Sky light
-    float unity_SHAr[4];
-    float unity_SHAg[4];
-    float unity_SHAb[4];
-    float unity_SHBr[4];
-    float unity_SHBg[4];
-    float unity_SHBb[4];
-    float unity_SHC[4];
+    float4 unity_SHAr;
+    float4 unity_SHAg;
+    float4 unity_SHAb;
+    float4 unity_SHBr;
+    float4 unity_SHBg;
+    float4 unity_SHBb;
+    float4 unity_SHC;
     
-    float skyCubeHDRDecodeValues[4];
+    float4 skyCubeHDRDecodeValues;
     
     int lightCount;
     int hasMainLightShadow;
@@ -77,8 +102,8 @@ struct MaterialDscriptor
     void* NormalMap;
     void* MaskMap;
     void* EmissionMap;
-    float BaseColor[4];
-    float Emission[4];
+    float4 BaseColor;
+    float4 Emission;
     float BumpScale;
     float Metallic;
     float Roughness;
@@ -88,35 +113,35 @@ struct MaterialDscriptor
 struct CameraData
 {
     //! Specifies matrix transformation from the camera view to the clip space.
-    float cameraViewToClip[16];
+    float4x4 cameraViewToClip;
     //! Specifies matrix transformation from the clip space to the camera view space.
-    float clipToCameraView[16];
+    float4x4 clipToCameraView;
     //! Optional - Specifies matrix transformation describing lens distortion in clip space.
-    float worldToClip[16];
-    float clipToWorld[16];
-    // float clipToLensClip[16];
+    float4x4 worldToClip;
+    float4x4 clipToWorld;
+    // float4x4 clipToLensClip;
     //! Specifies matrix transformation from the current clip to the previous clip space.
     //! clipToPrevClip = clipToView * viewToViewPrev * viewToClipPrev
     //! Sample code can be found in sl_matrix_helpers.h
-    float clipToPrevClip[16];
+    float4x4 clipToPrevClip;
     //! Specifies matrix transformation from the previous clip to the current clip space.
     //! prevClipToClip = clipToPrevClip.inverse()
-    float prevClipToClip[16];
+    float4x4 prevClipToClip;
 
     //! Specifies pixel space jitter offset
-    float jitterOffset[2];
+    float2 jitterOffset;
     //! Specifies scale factors used to normalize motion vectors (so the values are in [-1,1] range)
-    float mvecScale[2];
+    float2 mvecScale;
     //! Optional - Specifies camera pinhole offset if used.
-    // float cameraPinholeOffset[2];
+    // float2 cameraPinholeOffset;
     //! Specifies camera position in world space.
-    float cameraPos[3];
+    float3 cameraPos;
     //! Specifies camera up vector in world space.
-    float cameraUp[3];
+    float3 cameraUp;
     //! Specifies camera right vector in world space.
-    float cameraRight[3];
+    float3 cameraRight;
     //! Specifies camera forward vector in world space.
-    float cameraFwd[3];
+    float3 cameraFwd;
 
     //! Specifies camera near view plane distance.
     float cameraNear;
@@ -133,10 +158,10 @@ struct CameraData
     int viewHandle = 0;
 
     //! Specifies input texture size
-    int inputSize[2];
+    int2 inputSize;
 
     //! Specifies output texture size
-    int outputSize[2];
+    int2 outputSize;
 
     //! Specifies if depth values are inverted (value closer to the camera is higher) or not.
     bool depthInverted = true;
