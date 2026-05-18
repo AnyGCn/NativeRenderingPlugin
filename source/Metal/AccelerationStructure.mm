@@ -62,8 +62,14 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
     }
 
     MTLIntersectionFunctionDescriptor *intersectionDesc = [[MTLIntersectionFunctionDescriptor alloc] init];
-    intersectionDesc.name = @"rayIntersection";
+    intersectionDesc.name = @"alphaTestIntersection";
     id<MTLFunction> rtAnyHitFunction = [defaultLibrary newIntersectionFunctionWithDescriptor:intersectionDesc error:&error];
+    if (rtAnyHitFunction == nil)
+    {
+        RenderAPI::LogError("Failed to load intersection function 'alphaTestIntersection' from metallib: %s", error.localizedDescription.UTF8String);
+        return;
+    }
+
     MTLLinkedFunctions *linkedFunctions = [[MTLLinkedFunctions alloc] init];
     linkedFunctions.functions = @[ rtAnyHitFunction ]; // 注册 Any-Hit 函数
 
@@ -190,7 +196,7 @@ void AccelerationStructure::BuildBottomLevelAccelerationStructure(id<MTLCommandB
             g.vertexBuffer = (__bridge id<MTLBuffer>)mesh.positionBuffer;
             g.vertexBufferOffset = 0;
             g.vertexFormat = IsPositionHalf(mesh.vertexParameter) ? MTLAttributeFormatHalf4 : MTLAttributeFormatFloat3;
-            g.vertexStride = mesh.positionStride;
+            g.vertexStride = GetPositionStride(mesh.vertexParameter);
 
             g.indexBuffer = (__bridge id<MTLBuffer>)mesh.indexBuffer;
             g.indexBufferOffset = mesh.indexBufferOffset;
@@ -319,10 +325,7 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         pMesh->generics = genericBuffer.gpuAddress;
         pMesh->indices = indexBuffer.gpuAddress + mesh.indexBufferOffset;
         pMesh->vertexParameters = mesh.vertexParameter;
-        pMesh->positionStride = mesh.positionStride;
-        pMesh->genericStride = mesh.genericStride;
-        pMesh->genericOffset = mesh.genericOffset;
-        
+
         [_sceneResources addObject:positionBuffer];
         [_sceneResources addObject:genericBuffer];
         [_sceneResources addObject:indexBuffer];

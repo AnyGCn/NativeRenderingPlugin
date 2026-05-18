@@ -119,9 +119,6 @@ struct MeshDescriptor
     void* indexBuffer;
 
     int vertexParameter;
-    int positionStride;
-    int genericStride;
-    int genericOffset;
     int indexBufferOffset;
     int indexCount;
 };

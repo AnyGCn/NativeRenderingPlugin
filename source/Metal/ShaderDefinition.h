@@ -157,8 +157,8 @@ using namespace metal;
 struct AAPLInstance
 {
     // A reference to a single mesh in the meshes array stored in structure `Scene`.
-    uint32_t meshIndex;
     uint32_t materialIndex;
+    uint32_t meshIndex;
     uint32_t renderFlag;
     uint32_t padding;
 
@@ -234,25 +234,10 @@ struct AAPLRenderParameter
 
 struct AAPLMesh
 {
-    // The arrays of vertices.
-    // index format 1 bit
-    // position format 1 bit
-    // normal format 1 bit
-    // tangent format 1 bit
-    // color format 1 bit
-    // uv format 1 bit
-    // position stride 8 bit
-    // generic stride 8 bit
-    // generic offset 8 bit
-    uint32_t positionStride;
-    uint32_t genericStride;
-    uint32_t genericOffset;
-    uint32_t vertexParameters;
-    // Support 4 submesh mostly.
-//    uint4    subMeshIndexOffset     [[ id(1) ]];
     uint64_t positions;
     uint64_t generics;
     uint64_t indices;
+    uint32_t vertexParameters;
 };
 
 struct AAPLMaterial

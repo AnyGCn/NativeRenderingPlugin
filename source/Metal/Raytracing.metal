@@ -100,22 +100,24 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
 
     // Normal
     bool isGeneric = IsNormalInGeneric(mesh.vertexParameters);
+    constant uint8_t* pData = isGeneric ? pGenerics : pPositions;
     stride = isGeneric ? genericStride : positionStride;
     isHalf = IsNormalHalf(mesh.vertexParameters);
-    dataArray = LoadVertexDataDimension3(pGenerics, i0, i1, i2, stride, isHalf);
+    dataArray = LoadVertexDataDimension3(pData, i0, i1, i2, stride, isHalf);
     vertexOutput.normal = half4(dataArray * bary3).xyz;
     pPositions += isGeneric ? 0 : (isHalf ? 8 : 12);
     pGenerics += isGeneric ? (isHalf ? 8 : 12) : 0;
 
     // Tangent
     isGeneric = IsTangentInGeneric(mesh.vertexParameters);
+    pData = isGeneric ? pGenerics : pPositions;
     stride = isGeneric ? genericStride : positionStride;
     isHalf = IsTangentHalf(mesh.vertexParameters);
-    dataArray = LoadVertexDataDimension4(pGenerics, i0, i1, i2, stride, isHalf);
+    dataArray = LoadVertexDataDimension4(pData, i0, i1, i2, stride, isHalf);
     float4 tangentW = dataArray * bary3;
     vertexOutput.tangent = half4(tangentW).xyz;
-    pPositions += isGeneric ? 0 : (isHalf ? 8 : 12);
-    pGenerics += isGeneric ? (isHalf ? 8 : 12) : 0;
+    pPositions += isGeneric ? 0 : (isHalf ? 8 : 16);
+    pGenerics += isGeneric ? (isHalf ? 8 : 16) : 0;
 
     // Bitangent
     float4x4 mv = instance.transform;
@@ -132,9 +134,10 @@ Varyings LoadVertexData(uint primitive_id, float3 bary3, AAPLInstance instance, 
 
     // Texture coordinates (maybe memory access out of bounds)
     isGeneric = IsUVInGeneric(mesh.vertexParameters);
+    pData = isGeneric ? pGenerics : pPositions;
     stride = isGeneric ? genericStride : positionStride;
     isHalf = IsUVHalf(mesh.vertexParameters);
-    dataArray = LoadVertexDataDimension2(pGenerics, i0, i1, i2, stride, isHalf);
+    dataArray = LoadVertexDataDimension2(pData, i0, i1, i2, stride, isHalf);
     vertexOutput.texCoord = (dataArray * bary3).xy;
 
     return vertexOutput;
