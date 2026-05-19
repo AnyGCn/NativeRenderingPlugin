@@ -1,9 +1,3 @@
-//
-//  AccelerationStructure.mm
-//  RenderingPlugin
-//
-//  Created by 郭昱宁 on 2026/4/13.
-//
 #include "AccelerationStructure.h"
 #include "RenderAPI_Metal.h"
 #include "ShaderDefinition.h"
@@ -84,11 +78,9 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
         return;
     }
 
-    // 1. 配置函数表描述符
     MTLIntersectionFunctionTableDescriptor *tableDesc = [MTLIntersectionFunctionTableDescriptor intersectionFunctionTableDescriptor];
-    tableDesc.functionCount = 1; // 假设场景中只有 1 个需要应用 Alpha 裁剪的几何体类型
+    tableDesc.functionCount = 1;
     
-    // 2. 让管线生成与之兼容的函数表
     _intersectionFunctionTable = [_rtReflectionPipeline newIntersectionFunctionTableWithDescriptor:tableDesc];
     [_intersectionFunctionTable setFunction:[_rtReflectionPipeline functionHandleWithFunction:rtAnyHitFunction] atIndex:0];
 
@@ -100,10 +92,25 @@ void AccelerationStructure::Initialize(id<MTLDevice> device)
     }
 
     _accelerationStructureBuildEvent = [_device newEvent];
+    _accelerationStructureHeaps = [[NSMutableArray alloc] init];
     _sceneResources = [[NSMutableArray alloc] init];
-    _sceneHeaps = [[NSMutableArray alloc] init];
+    _primitiveAccelerationStructures = [[NSMutableArray alloc] init];
     _initialized = true;
     _accelerationStructureDirty = false;
+}
+
+id<MTLHeap> AccelerationStructure::GetAvailableHeap(const MTLSizeAndAlign& requiredSize)
+{
+    for (int i = 0; i < _accelerationStructureHeaps.count; i++)
+    {
+        if ([_accelerationStructureHeaps[i] maxAvailableSizeWithAlignment:requiredSize.align] >= requiredSize.size)
+            return _accelerationStructureHeaps[i];
+    }
+    
+    MTLHeapDescriptor* heapDesc = [[MTLHeapDescriptor alloc] init];
+    heapDesc.size = fmax(256 * 1024 * 1024, requiredSize.size + requiredSize.align);
+    [_accelerationStructureHeaps addObject:[_device newHeapWithDescriptor: heapDesc]];
+    return _accelerationStructureHeaps.lastObject;
 }
 
 MTLAccelerationStructureSizes AccelerationStructure::calculateSizeForPrimitiveAccelerationStructures(NSArray<MTLPrimitiveAccelerationStructureDescriptor*>*primitiveAccelerationDescriptors)
@@ -165,12 +172,20 @@ void AccelerationStructure::SetMaterials(const MaterialDscriptor *materials, int
 {
     _materialDescriptors.resize(count);
     memcpy(_materialDescriptors.data(), materials, count * sizeof(MaterialDscriptor));
+    _accelerationStructureDirty = true;
 }
 
 void AccelerationStructure::SetMeshes(const MeshDescriptor* meshes, int meshCount)
 {
     _meshDescriptors.resize(meshCount);
     memcpy(_meshDescriptors.data(), meshes, meshCount * sizeof(MeshDescriptor));
+    _accelerationStructureDirty = true;
+}
+
+void AccelerationStructure::SetRaytracingGeometryBuildRequestList(const int* pBuildRequestList, int count)
+{
+    _geometryBuildRequestList.resize(count);
+    memcpy(_geometryBuildRequestList.data(), pBuildRequestList, count * sizeof(int));
     _accelerationStructureDirty = true;
 }
 
@@ -184,42 +199,44 @@ void AccelerationStructure::SetRenderParameters(const RaytracingRenderParameters
 
 void AccelerationStructure::BuildBottomLevelAccelerationStructure(id<MTLCommandBuffer> cmd)
 {
-    constexpr int subMeshCount = 1;
-    NSMutableArray<MTLPrimitiveAccelerationStructureDescriptor*> *_primitiveAccelerationDescriptors = [NSMutableArray arrayWithCapacity:_meshDescriptors.size()];
-    for (int meshIndex = 0; meshIndex < _meshDescriptors.size(); ++meshIndex)
+    if (_geometryBuildRequestList.size() == 0)
+        return;
+    
+    // Resize to match the number of meshes
+    for (NSUInteger i = _primitiveAccelerationStructures.count; i < _meshDescriptors.size(); ++i)
+        [_primitiveAccelerationStructures addObject:(id)[NSNull null]];
+
+    id<MTLAccelerationStructureCommandEncoder> enc = [cmd accelerationStructureCommandEncoder];
+    id<MTLBuffer> scratch = [_device newBufferWithLength: 16 * 1024 * 1024 options:MTLResourceStorageModePrivate];
+    for (int buildIndex = 0; buildIndex < _geometryBuildRequestList.size(); ++buildIndex)
     {
-        NSMutableArray< MTLAccelerationStructureTriangleGeometryDescriptor* >* geometries = [NSMutableArray arrayWithCapacity:subMeshCount];
-        for (int subMeshIndex = 0; subMeshIndex < subMeshCount; ++subMeshIndex)
-        {
-            const MeshDescriptor& mesh = _meshDescriptors[meshIndex];
-            MTLAccelerationStructureTriangleGeometryDescriptor* g = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
-            g.vertexBuffer = (__bridge id<MTLBuffer>)mesh.positionBuffer;
-            g.vertexBufferOffset = 0;
-            g.vertexFormat = IsPositionHalf(mesh.vertexParameter) ? MTLAttributeFormatHalf4 : MTLAttributeFormatFloat3;
-            g.vertexStride = GetPositionStride(mesh.vertexParameter);
-
-            g.indexBuffer = (__bridge id<MTLBuffer>)mesh.indexBuffer;
-            g.indexBufferOffset = mesh.indexBufferOffset;
-            g.indexType = IsIndexHalf(mesh.vertexParameter) ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
-            g.triangleCount = mesh.indexCount / 3;
-            [geometries addObject:g];
-        }
-
+        int blasIndex = _geometryBuildRequestList[buildIndex];
         MTLPrimitiveAccelerationStructureDescriptor* primDesc = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
-        primDesc.geometryDescriptors = geometries;
-        [_primitiveAccelerationDescriptors addObject:primDesc];
+        const MeshDescriptor& mesh = _meshDescriptors[blasIndex];
+        MTLAccelerationStructureTriangleGeometryDescriptor* geometry = [MTLAccelerationStructureTriangleGeometryDescriptor descriptor];
+        geometry.vertexBuffer = (__bridge id<MTLBuffer>)mesh.positionBuffer;
+        geometry.vertexBufferOffset = 0;
+        geometry.vertexFormat = IsPositionHalf(mesh.vertexParameter) ? MTLAttributeFormatHalf4 : MTLAttributeFormatFloat3;
+        geometry.vertexStride = GetPositionStride(mesh.vertexParameter);
+
+        geometry.indexBuffer = (__bridge id<MTLBuffer>)mesh.indexBuffer;
+        geometry.indexBufferOffset = mesh.indexBufferOffset;
+        geometry.indexType = IsIndexHalf(mesh.vertexParameter) ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
+        geometry.triangleCount = mesh.indexCount / 3;
+        primDesc.geometryDescriptors = @[ geometry ];
+        
+        MTLSizeAndAlign sizeAndAlign = [_device heapAccelerationStructureSizeAndAlignWithDescriptor:primDesc];
+        MTLAccelerationStructureSizes sizes = [_device accelerationStructureSizesWithDescriptor:primDesc];
+        if (scratch.length < sizes.buildScratchBufferSize)
+            scratch = [_device newBufferWithLength: sizes.buildScratchBufferSize options:MTLResourceStorageModePrivate];
+        id<MTLAccelerationStructure> accelStructure = [GetAvailableHeap(sizeAndAlign) newAccelerationStructureWithSize:sizeAndAlign.size];
+        [enc buildAccelerationStructure:accelStructure descriptor:primDesc scratchBuffer:scratch scratchBufferOffset:0];
+        _primitiveAccelerationStructures[blasIndex] = accelStructure;
     }
     
-    if ( [_device supportsFamily:MTLGPUFamilyMetal3] )
-    {
-        MTLAccelerationStructureSizes storageSizes = calculateSizeForPrimitiveAccelerationStructures(_primitiveAccelerationDescriptors);
-        MTLHeapDescriptor* heapDesc = [[MTLHeapDescriptor alloc] init];
-        heapDesc.size = storageSizes.accelerationStructureSize;
-        _accelerationStructureHeap = [_device newHeapWithDescriptor:heapDesc];
-        primitiveAccelerationStructures = allocateAndBuildAccelerationStructuresWithDescriptors(cmd, _primitiveAccelerationDescriptors, _accelerationStructureHeap, storageSizes.buildScratchBufferSize, _accelerationStructureBuildEvent);
-    }
-
-    [_sceneHeaps addObject:_accelerationStructureHeap];
+    [enc endEncoding];
+    [cmd encodeSignalEvent:_accelerationStructureBuildEvent value:kPrimitiveAccelerationStructureBuild];
+    _geometryBuildRequestList.clear();
 }
 
 const static MTLAccelerationStructureInstanceOptions cullingOptions[] =
@@ -245,13 +262,13 @@ inline uint32_t GetRaytracingMask(uint32_t renderFlag)
 inline MTLAccelerationStructureInstanceOptions GetRaytracingOptions(uint32_t renderFlag)
 {
     return cullingOptions[(renderFlag & RTInstMaskCullMode) >> RTInstBitCullMode] |
-    (renderFlag & RTInstBitOpaque ? MTLAccelerationStructureInstanceOptionOpaque : MTLAccelerationStructureInstanceOptionNonOpaque);
+    (renderFlag & RTInstMaskOpaque ? MTLAccelerationStructureInstanceOptionOpaque : MTLAccelerationStructureInstanceOptionNonOpaque);
 }
 
 void AccelerationStructure::BuildTopLevelAccelerationStructure(id<MTLCommandBuffer> cmd)
 {
     MTLInstanceAccelerationStructureDescriptor* instanceAccelStructureDesc = [MTLInstanceAccelerationStructureDescriptor descriptor];
-    instanceAccelStructureDesc.instancedAccelerationStructures = primitiveAccelerationStructures;
+    instanceAccelStructureDesc.instancedAccelerationStructures = _primitiveAccelerationStructures;
 
     NSUInteger instanceCount = _instanceDescriptors.size();
     instanceAccelStructureDesc.instanceCount = instanceCount;
@@ -262,7 +279,6 @@ void AccelerationStructure::BuildTopLevelAccelerationStructure(id<MTLCommandBuff
     MTLAccelerationStructureInstanceDescriptor* accelInstanceDescs = (MTLAccelerationStructureInstanceDescriptor *)instanceDescriptorBuffer.contents;
     for (NSUInteger i = 0; i < _instanceDescriptors.size(); ++i)
     {
-        
         const InstanceDescriptor& instance = _instanceDescriptors[i];
         accelInstanceDescs[i].accelerationStructureIndex = instance.meshIndex;
         accelInstanceDescs[i].intersectionFunctionTableOffset = 0;
@@ -388,7 +404,6 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
     if (_accelerationStructureDirty)
     {
         [_sceneResources removeAllObjects];
-        [_sceneHeaps removeAllObjects];
         BuildBottomLevelAccelerationStructure(commandBuffer);
         BuildTopLevelAccelerationStructure(commandBuffer);
         BuildSceneArgumentBuffer(commandBuffer);
@@ -417,7 +432,7 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
     [compEnc setComputePipelineState:_rtReflectionPipeline];
     
     // Flag residency for indirectly referenced heaps to make the driver put them into GPU memory.
-    arrayToBatchMethodHelper(_sceneHeaps, ^(__unsafe_unretained id *data, NSUInteger count)
+    arrayToBatchMethodHelper(_accelerationStructureHeaps, ^(__unsafe_unretained id *data, NSUInteger count)
     {
         [compEnc useHeaps:data
                     count:count];
@@ -445,16 +460,16 @@ void AccelerationStructure::CleanupRaytracing()
 {
     // Release acceleration structure resources
     _instanceAccelerationStructure = nil;
-    primitiveAccelerationStructures = nil;
-    _accelerationStructureHeap = nil;
+    [_primitiveAccelerationStructures removeAllObjects];
+    [_accelerationStructureHeaps removeAllObjects];
 
     // Release argument buffer
     _sceneArgumentBuffer = nil;
     [_sceneResources removeAllObjects];
-    [_sceneHeaps removeAllObjects];
 
     // Clear C++ containers
     _instanceDescriptors.clear();
     _materialDescriptors.clear();
     _meshDescriptors.clear();
+    _geometryBuildRequestList.clear();
 }

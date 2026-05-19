@@ -189,6 +189,11 @@ void RenderAPI_Metal::SetRaytracingMeshes(const MeshDescriptor* pMeshes, int cou
     m_accelerationStructure->SetMeshes(pMeshes, count);
 }
 
+void RenderAPI_Metal::SetRaytracingGeometryBuildRequestList(const int* pBuildRequestList, int count) API_AVAILABLE(ios(17.0), macosx(14.0))
+{
+    m_accelerationStructure->SetRaytracingGeometryBuildRequestList(pBuildRequestList, count);
+}
+
 void RenderAPI_Metal::SetRaytracingRenderParameters(const RaytracingRenderParameters& lightData) API_AVAILABLE(ios(17.0), macosx(14.0))
 {
     m_accelerationStructure->SetRenderParameters(lightData);

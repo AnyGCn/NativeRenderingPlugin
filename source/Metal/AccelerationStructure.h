@@ -1,9 +1,3 @@
-//
-//  AccelerationStructure.h
-//  RenderingPlugin
-//
-//  Created by 郭昱宁 on 2026/4/13.
-//
 #pragma once
 
 #import <Metal/Metal.h>
@@ -22,6 +16,7 @@ class API_AVAILABLE(ios(17.0), macos(14.0)) AccelerationStructure
 {
     constexpr static int kPrimitiveAccelerationStructureBuild = 1;
     constexpr static int kInstanceAccelerationStructureBuild = 2;
+    constexpr static int kInitialAccelerationStructureHeapSize = 256 * 1024 * 1024;
 
     bool _accelerationStructureDirty;
     bool _initialized = false;
@@ -34,23 +29,24 @@ class API_AVAILABLE(ios(17.0), macos(14.0)) AccelerationStructure
     id<MTLComputePipelineState> _rtReflectionPipeline;
 
     id<MTLEvent> _accelerationStructureBuildEvent;
-    id<MTLHeap> _accelerationStructureHeap;
 
     id<MTLBuffer> _sceneArgumentBuffer;
     id<MTLAccelerationStructure> _instanceAccelerationStructure;
-    NSArray< id<MTLAccelerationStructure> > *primitiveAccelerationStructures;
-    
+    NSMutableArray< id<MTLAccelerationStructure> > *_primitiveAccelerationStructures;
+    NSMutableArray<id<MTLHeap>>* _accelerationStructureHeaps;
+
     std::vector<InstanceDescriptor> _instanceDescriptors;
     std::vector<MaterialDscriptor> _materialDescriptors;
     std::vector<MeshDescriptor> _meshDescriptors;
+    std::vector<int> _geometryBuildRequestList;
 
     NSMutableArray<id<MTLResource>>* _sceneResources;
-    NSMutableArray<id<MTLHeap>>* _sceneHeaps;
 
     id<MTLBuffer> newBufferWithLabel(NSString *label, NSUInteger length, MTLResourceOptions options);
     MTLAccelerationStructureSizes calculateSizeForPrimitiveAccelerationStructures(NSArray<MTLPrimitiveAccelerationStructureDescriptor*>*primitiveAccelerationDescriptors);
     NSArray<id<MTLAccelerationStructure>>* allocateAndBuildAccelerationStructuresWithDescriptors(id<MTLCommandBuffer> cmd, NSArray<MTLAccelerationStructureDescriptor *>* descriptors, id<MTLHeap> heap, size_t maxScratchSize, id<MTLEvent> event);
     id<MTLAccelerationStructure> allocateAndBuildAccelerationStructureWithDescriptor(MTLAccelerationStructureDescriptor* descriptor, id<MTLCommandBuffer> cmd);
+    id<MTLHeap> GetAvailableHeap(const MTLSizeAndAlign& requiredSize);
 
 public:
     AccelerationStructure() {}
@@ -60,6 +56,7 @@ public:
     void SetInstances(const InstanceDescriptor* instances, int count);
     void SetMaterials(const MaterialDscriptor* materials, int count);
     void SetMeshes(const MeshDescriptor* meshes, int count);
+    void SetRaytracingGeometryBuildRequestList(const int* buildRequestList, int count);
     void SetRenderParameters(const RaytracingRenderParameters& lightData);
 
     void BuildBottomLevelAccelerationStructure(id<MTLCommandBuffer> cmd);

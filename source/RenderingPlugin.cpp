@@ -218,6 +218,11 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingMeshes(c
     s_CurrentAPI->SetRaytracingMeshes(pMeshes, count);
 }
 
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingGeometryBuildRequestList(const int* pBuildRequestList, int count)
+{
+    s_CurrentAPI->SetRaytracingGeometryBuildRequestList(pBuildRequestList, count);
+}
+
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API SetRaytracingRenderParameters(const RaytracingRenderParameters* pLightData)
 {
     s_CurrentAPI->SetRaytracingRenderParameters(*pLightData);

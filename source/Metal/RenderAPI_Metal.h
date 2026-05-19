@@ -26,6 +26,7 @@ public:
     virtual void SetRaytracingInstances(const InstanceDescriptor* pInstances, int count) override;
     virtual void SetRaytracingMaterials(const MaterialDscriptor* pMaterials, int count) override;
     virtual void SetRaytracingMeshes(const MeshDescriptor* pMeshes, int count) override;
+    virtual void SetRaytracingGeometryBuildRequestList(const int* pBuildRequestList, int count) override;
     virtual void SetRaytracingRenderParameters(const RaytracingRenderParameters& lightData) override;
 
 private:
