@@ -364,12 +364,10 @@ void AccelerationStructure::BuildSceneArgumentBuffer(id<MTLCommandBuffer> cmd)
         pMaterial->textures[AAPLTextureIndexNormal] = normalMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexMask] = maskMap.gpuResourceID;
         pMaterial->textures[AAPLTextureIndexEmission] = emissionMap.gpuResourceID;
-        pMaterial->_BaseColor = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].BaseColor);
-        pMaterial->_Emission = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].Emission);
-        pMaterial->_BumpScale = _materialDescriptors[i].BumpScale;
-        pMaterial->_Metallic = _materialDescriptors[i].Metallic;
-        pMaterial->_Roughness = _materialDescriptors[i].Roughness;
-        pMaterial->_Occlusion = _materialDescriptors[i].Occlusion;
+        pMaterial->BaseColor = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].BaseColor);
+        pMaterial->Emission = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].Emission);
+        pMaterial->SurfaceScale = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].SurfaceScale);
+        pMaterial->MaterialParam = *reinterpret_cast<simd_float4 *>(&_materialDescriptors[i].MaterialParam);
         [_sceneResources addObject:baseMap];
         [_sceneResources addObject:normalMap];
         [_sceneResources addObject:maskMap];
@@ -417,7 +415,8 @@ void AccelerationStructure::DispatchRaytracing(id<MTLCommandBuffer> commandBuffe
     [compEnc setTexture:textures[AAPLRaytracingGBufferDepthIndex] atIndex:AAPLRaytracingGBufferDepthIndex];
     [compEnc setTexture:textures[AAPLRaytracingGBufferNormalIndex] atIndex:AAPLRaytracingGBufferNormalIndex];
     [compEnc setTexture:textures[AAPLRaytracingGBufferMaskIndex] atIndex:AAPLRaytracingGBufferMaskIndex];
-    [compEnc setTexture:textures[AAPLRaytracingMainLightShadowMap] atIndex:AAPLRaytracingMainLightShadowMap];
+    [compEnc setTexture:textures[AAPLRaytracingScreenSpaceDiffuse] atIndex:AAPLRaytracingScreenSpaceDiffuse];
+    [compEnc setTexture:textures[AAPLRaytracingScreenSpaceAO] atIndex:AAPLRaytracingScreenSpaceAO];
     [compEnc setTexture:textures[AAPLRaytracingSkyCubeMap] atIndex:AAPLRaytracingSkyCubeMap];
     [compEnc setBuffer: _renderParametersBuffers[_constantBufferIndex] offset:0 atIndex:AAPLBufferIndexRenderParameter];
 

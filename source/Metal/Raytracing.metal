@@ -179,12 +179,77 @@ bool alphaTestIntersection(
     return (matData.alpha >= alphaCutoff);
 }
 
+half4 GetRaytracingReflection(constant AAPLScene* pScene, constant AAPLRenderParameter& renderData, texturecube< half > skyCube, instance_acceleration_structure accelerationStructure, intersection_function_table<instancing, triangle_data> functionTable, float3 worldPos, float3 reflectDir, half3 indirectDiffuseOverride, int traceCount)
+{
+    half4 finalColor = half4( 0.0, 0.0, 0.0, 0.0 );
+    raytracing::ray r;
+    r.origin = worldPos;
+    r.direction = reflectDir;
+    r.min_distance = 0.1;
+    r.max_distance = FLT_MAX;
+
+    raytracing::intersector<instancing, triangle_data> inter;
+    inter.assume_geometry_type( raytracing::geometry_type::triangle );
+    auto intersection = inter.intersect( r, accelerationStructure, AAPLRaytracingMaskNormal, functionTable );
+    if ( intersection.type != raytracing::intersection_type::triangle )
+    {
+        return finalColor;
+    }
+    
+    float2 bary2 = intersection.triangle_barycentric_coord;
+    float3 bary3 = float3( 1.0 - (bary2.x + bary2.y), bary2.x, bary2.y );
+    
+    constant AAPLInstance& instance = pScene->instances[ intersection.instance_id ];
+    constant AAPLMesh& mesh = pScene->meshes[instance.meshIndex];
+    constant AAPLMaterial& material = pScene->materials[instance.materialIndex];
+    Varyings vertexOutput = LoadVertexData(intersection.primitive_id, bary3, instance, mesh);
+
+    vertexOutput.worldPosition = r.origin + r.direction * intersection.distance;
+    MaterialParameter matData = InitializeMaterialData(vertexOutput, material);
+    float3 normalWS = float3(matData.normalWS);
+    float3 viewDir = -r.direction;
+    reflectDir = reflect(-viewDir, normalWS);
+    finalColor = half4(0, 0, 0, 1.0);
+    
+    // Main light
+    if (renderData.lightCount > 0)
+    {
+        LightParameter lightParam = GetLightParameter(renderData.lights[0], vertexOutput.worldPosition);
+        lightParam.shadowAttenuation = renderData.hasMainLightShadow ? MainLightShadowUsingRaytracing(accelerationStructure, functionTable, vertexOutput.worldPosition, float3(lightParam.direction)) : 1.0;
+        finalColor.xyz += BRDFDataToLightingResult(matData, lightParam, half3(viewDir));
+    }
+
+    for (uint32_t lightIndex = 1; lightIndex < renderData.lightCount; ++lightIndex)
+    {
+        LightParameter lightParam = GetLightParameter(renderData.lights[lightIndex], vertexOutput.worldPosition);
+        finalColor.xyz += BRDFDataToLightingResult(matData, lightParam, half3(viewDir));
+    }
+
+    // Indirect light
+    {
+        half3 indirectDiffuse = min(DiffuseGI(renderData, normalWS).rgb, indirectDiffuseOverride);
+        half3 specluarTerm = EnvironmentBRDFSpecular(matData, saturate(dot(normalWS, viewDir)));
+        half3 indirectSpecular = GetEnvironmentReflectionFromSkyCube(reflectDir, matData.perceptualRoughness, skyCube, renderData.skyCubeHDRDecodeValues);
+//        if (matData.perceptualRoughness < 0.03f && traceCount < 1)
+//        {
+//            // no more than 2 times reflection
+//            half4 reflectColor = GetRaytracingReflection(pScene, renderData, skyCube, accelerationStructure, functionTable, vertexOutput.worldPosition, reflectDir, indirectDiffuse, traceCount + 1);
+//            indirectSpecular = mix(indirectSpecular, reflectColor.rgb, reflectColor.a);
+//        }
+
+        finalColor.xyz += (indirectDiffuse * matData.diffuse + indirectSpecular * specluarTerm) * matData.occlusion;
+    }
+
+    return finalColor;
+}
+
 kernel void rtReflection(
              texture2d< half, access::write >       outImage                [[texture(AAPLRaytracingOutImageIndex)]],
              texture2d< float >                     depth                   [[texture(AAPLRaytracingGBufferDepthIndex)]],
              texture2d< half >                      normalMap               [[texture(AAPLRaytracingGBufferNormalIndex)]],
              texture2d< half >                      maskMap                 [[texture(AAPLRaytracingGBufferMaskIndex)]],
-             depth2d< float >                       mainlightShadowMap      [[texture(AAPLRaytracingMainLightShadowMap)]],
+             texture2d< half >                      ssgi                    [[texture(AAPLRaytracingScreenSpaceDiffuse)]],
+             texture2d< half >                      ssao                    [[texture(AAPLRaytracingScreenSpaceAO)]],
              texturecube< half >                    skyCube                 [[texture(AAPLRaytracingSkyCubeMap)]],
              constant AAPLRenderParameter&          renderData              [[buffer(AAPLBufferIndexRenderParameter)]],
              constant AAPLScene*                    pScene                  [[buffer(AAPLBufferIndexScene)]],
@@ -193,88 +258,42 @@ kernel void rtReflection(
              uint2 tid [[thread_position_in_grid]])
 {
     uint2 outputSize = uint2(outImage.get_width(), outImage.get_height());
-    if (all(tid < outputSize))
+    if (any(tid >= outputSize))
+        return;
+
+    half4 finalColor = half4( 0.0, 0.0, 0.0, 0.0 );
+    if (is_null_instance_acceleration_structure(accelerationStructure))
     {
-        half4 finalColor = half4( 0.0, 0.0, 0.0, 1.0 );
-        if (is_null_instance_acceleration_structure(accelerationStructure))
-        {
-            finalColor = half4( 0.0, 0.0, 0.0, 0.0 );
-        }
-        else
-        {
-            // Reconstruct world-space position from depth
-            uint2 inputSize = uint2(depth.get_width(), depth.get_height());
-            uint2 inputCoord = tid * inputSize / outputSize;
-            float2 uv = (float2(inputCoord) + 0.5f) / float2(inputSize); // pixel center -> [0,1]
-            float depth01 = depth.read(inputCoord).x;                    // depth in [0,1] clip space
-            float ndcZ = depth01;                                        // to NDC z
-            float4 clipPos = float4(uv * 2.0f - 1.0f, ndcZ, 1.0f);       // NDC xy,z
-            clipPos.y = -clipPos.y;
-            float4 worldPosH = renderData.MatrixVP_Inv * clipPos;  // homogeneous world
-            float3 worldPos = worldPosH.xyz / worldPosH.w;
-
-            // Decode oct-encoded normal from the normal map
-            float3 normalWS = UnpackOctNormal(normalMap.read(inputCoord).xyz);
-            float3 viewDir = normalize(renderData.cameraPosition.xyz - worldPos);
-            float3 reflectDir = reflect(-viewDir, normalWS);
-
-            raytracing::ray r;
-            r.origin = worldPos;
-            r.direction = reflectDir;
-            r.min_distance = 0.1;
-            r.max_distance = FLT_MAX;
-
-            raytracing::intersector<instancing, triangle_data> inter;
-            inter.force_opacity( raytracing::forced_opacity::opaque );
-            inter.assume_geometry_type( raytracing::geometry_type::triangle );
-            auto intersection = inter.intersect( r, accelerationStructure, AAPLRaytracingMaskNormal, functionTable );
-            if ( intersection.type == raytracing::intersection_type::triangle )
-            {
-                float2 bary2 = intersection.triangle_barycentric_coord;
-                float3 bary3 = float3( 1.0 - (bary2.x + bary2.y), bary2.x, bary2.y );
-                
-                constant AAPLInstance& instance = pScene->instances[ intersection.instance_id ];
-                constant AAPLMesh& mesh = pScene->meshes[instance.meshIndex];
-                constant AAPLMaterial& material = pScene->materials[instance.materialIndex];
-                Varyings vertexOutput = LoadVertexData(intersection.primitive_id, bary3, instance, mesh);
-
-//                float3 cameraPosition = r.origin;
-                vertexOutput.worldPosition = r.origin + r.direction * intersection.distance;
-                MaterialParameter matData = InitializeMaterialData(vertexOutput, material);
-                normalWS = float3(matData.normalWS);
-                viewDir = -r.direction;
-                reflectDir = reflect(-viewDir, normalWS);
-                finalColor = half4(0, 0, 0, 1.0);
-                // Indirect light
-                {
-                    half3 indirectDiffuse = DiffuseGI(renderData, normalWS).rgb * matData.diffuse;
-                    half NoV = saturate(dot(normalWS, viewDir));
-                    half fresnelTerm = 1.0 - NoV;
-                    fresnelTerm *= fresnelTerm;
-                    fresnelTerm *= fresnelTerm;
-                    half3 indirectSpecular = GetEnvironmentReflectionFromSkyCube(reflectDir, matData.perceptualRoughness, skyCube, renderData.skyCubeHDRDecodeValues) * EnvironmentBRDFSpecular(matData, fresnelTerm);
-                    finalColor.xyz += indirectDiffuse + indirectSpecular;
-                }
-                
-                // Main light
-                if (renderData.lightCount > 0)
-                {
-                    LightParameter lightParam = GetLightParameter(renderData.lights[0], vertexOutput.worldPosition);
-                    lightParam.shadowAttenuation = renderData.hasMainLightShadow ? MainLightShadowUsingRaytracing(accelerationStructure, functionTable, vertexOutput.worldPosition, float3(lightParam.direction)) : 1.0;
-                    finalColor.xyz += BRDFDataToLightingResult(matData, lightParam, half3(viewDir));
-                }
-
-                for (uint32_t lightIndex = 1; lightIndex < renderData.lightCount; ++lightIndex)
-                {
-                    LightParameter lightParam = GetLightParameter(renderData.lights[lightIndex], vertexOutput.worldPosition);
-                    finalColor.xyz += BRDFDataToLightingResult(matData, lightParam, half3(viewDir));
-                }
-            }
-            else if ( intersection.type == raytracing::intersection_type::none )
-            {
-                finalColor = half4( 0.0f, 0.0f, 0.0f, 0.0f );
-            }
-        }
         outImage.write( finalColor, tid );
+        return;
     }
+
+    // Reconstruct world-space position from depth
+    uint2 inputSize = uint2(depth.get_width(), depth.get_height());
+    uint2 inputCoord = tid * inputSize / outputSize;
+    float perceptualRoughness = 1 - maskMap.read(inputCoord).b;
+    if (perceptualRoughness > renderData.reflectionParams.x)
+    {
+        outImage.write( finalColor, tid );
+        return;
+    }
+
+    float2 uv = (float2(inputCoord) + 0.5f) / float2(inputSize); // pixel center -> [0,1]
+    float depth01 = depth.read(inputCoord).x;                    // depth in [0,1] clip space
+    float ndcZ = depth01;                                        // to NDC z
+    float4 clipPos = float4(uv * 2.0f - 1.0f, ndcZ, 1.0f);       // NDC xy,z
+    clipPos.y = -clipPos.y;
+    float4 worldPosH = renderData.MatrixVP_Inv * clipPos;  // homogeneous world
+    float3 worldPos = worldPosH.xyz / worldPosH.w;
+    // Decode oct-encoded normal from the normal map
+    float3 normalWS = UnpackOctNormal(normalMap.read(inputCoord).xyz);
+    float3 viewDir = normalize(renderData.cameraPosition.xyz - worldPos);
+    float3 reflectDir = reflect(-viewDir, normalWS);
+
+    half3 indirectDiffuse = is_null_texture(ssgi) ? half3(10.0) : ssgi.sample(linearSampler, uv).rgb;
+    finalColor = GetRaytracingReflection(pScene, renderData, skyCube, accelerationStructure, functionTable, worldPos, reflectDir, indirectDiffuse, 0);
+
+    finalColor.xyz *= renderData.reflectionParams.w;
+    finalColor *= GetRoughnessFade(perceptualRoughness, renderData.reflectionParams.y, renderData.reflectionParams.z);
+    outImage.write( finalColor, tid );
 }

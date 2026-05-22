@@ -208,7 +208,8 @@ void RenderAPI_Metal::DispatchRaytracing() API_AVAILABLE(ios(17.0), macosx(14.0)
     textures[AAPLRaytracingGBufferDepthIndex] = (__bridge id<MTLTexture>)m_Textures[eDepth];
     textures[AAPLRaytracingGBufferNormalIndex] = (__bridge id<MTLTexture>)m_Textures[eNormal];
     textures[AAPLRaytracingGBufferMaskIndex] = (__bridge id<MTLTexture>)m_Textures[eGBufferMask];
-    textures[AAPLRaytracingMainLightShadowMap] = (__bridge id<MTLTexture>)m_Textures[eMainLightShadowMap];
+    textures[AAPLRaytracingScreenSpaceDiffuse] = (__bridge id<MTLTexture>)m_Textures[eScreenSpaceDiffuse];
+    textures[AAPLRaytracingScreenSpaceAO] = (__bridge id<MTLTexture>)m_Textures[eScreenSpaceAO];
     textures[AAPLRaytracingSkyCubeMap] = (__bridge id<MTLTexture>)m_Textures[eSkyCube];
     m_MetalGraphics->EndCurrentCommandEncoder();
     m_accelerationStructure->DispatchRaytracing(commandBuffer, textures);

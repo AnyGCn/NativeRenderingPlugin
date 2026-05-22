@@ -218,17 +218,30 @@ MaterialParameter InitializeMaterialData(Varyings in, AAPLMaterial materialData)
 {
     MaterialParameter outMaterialData;
     half4 albedoAlpha = materialData.textures[AAPLTextureIndexBaseColor].sample(linearSampler, in.texCoord.xy);
-    outMaterialData.alpha = albedoAlpha.a * materialData._BaseColor.a;
-    outMaterialData.albedo = albedoAlpha.rgb * half3(materialData._BaseColor.rgb);
+    outMaterialData.alpha = albedoAlpha.a * materialData.BaseColor.a;
+    outMaterialData.albedo = albedoAlpha.rgb * half3(materialData.BaseColor.rgb);
     
     half4 ARM = materialData.textures[AAPLTextureIndexMask].sample(linearSampler, in.texCoord.xy);
-    outMaterialData.occlusion = ARM.r;
-    outMaterialData.metallic = ARM.b * materialData._Metallic;
-    outMaterialData.smoothness = 1.0f - (ARM.g * materialData._Roughness);
+    if (materialData.MaterialParam.x > 0.5f)        // different model
+    {
+        outMaterialData.occlusion = ARM.b;
+        outMaterialData.metallic = ARM.r;
+        outMaterialData.smoothness = ARM.g;
+    }
+    else
+    {
+        outMaterialData.occlusion = ARM.r;
+        outMaterialData.metallic = ARM.b;
+        outMaterialData.smoothness = ARM.g;
+    }
+    
+    outMaterialData.occlusion = mix(half(1.0), outMaterialData.occlusion, half(materialData.SurfaceScale.y));
+    outMaterialData.metallic = outMaterialData.metallic * materialData.SurfaceScale.z;
+    outMaterialData.smoothness = 1.0f - (outMaterialData.smoothness * materialData.SurfaceScale.w);
     outMaterialData.specular = half3(0.0, 0.0, 0.0);
     
-    half3 normalTS = UnpackNormalScale(materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy), materialData._BumpScale);
-    outMaterialData.emission = materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy).rgb * half3(materialData._Emission.rgb) * materialData._Emission.a;
+    half3 normalTS = UnpackNormalScale(materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy), materialData.SurfaceScale.x);
+    outMaterialData.emission = materialData.textures[AAPLTextureIndexNormal].sample(linearSampler, in.texCoord.xy).rgb * half3(materialData.Emission.rgb) * materialData.Emission.a;
     half3x3 tangentToWorld = half3x3(in.tangent.xyz, in.bitangent.xyz, in.normal.xyz);
     outMaterialData.normalWS = tangentToWorld * normalTS;
     half oneMinusReflectivity = OneMinusReflectivityMetallic(outMaterialData.metallic);
@@ -268,6 +281,7 @@ float DirectBRDFSpecular(MaterialParameter brdfData, half3 normalWS, half3 light
 
     float LoH2 = LoH * LoH;
     float specularTerm = brdfData.roughness2 / ((d * d) * max(0.1, LoH2) * brdfData.normalizationTerm);
+    specularTerm = clamp(specularTerm, 0.0, 1000.0); // Prevent FP16 overflow on mobiles
 
     return specularTerm;
 }
@@ -425,8 +439,27 @@ half3 GetEnvironmentReflectionFromSkyCube(float3 reflectVector, half perceptualR
     return irradiance;
 }
 
-half3 EnvironmentBRDFSpecular(MaterialParameter brdfData, half fresnelTerm)
+half3 EnvironmentBRDFSpecular(MaterialParameter brdfData, half NoV)
 {
+    half fresnelTerm = 1.0 - NoV;
+    fresnelTerm *= fresnelTerm;
+    fresnelTerm *= fresnelTerm;
     half surfaceReduction = 1.0 / (brdfData.roughness2 + 1.0);
     return half3(surfaceReduction * mix(brdfData.specular, brdfData.grazingTerm, fresnelTerm));
+}
+
+float Remap10(float x, float rcpLength, float endTimesRcpLength)
+{
+    return saturate(endTimesRcpLength - x * rcpLength);
+}
+
+float Smoothstep01(float x)
+{
+    return x * x * (3 - (2 * x));
+}
+
+float GetRoughnessFade(float roughness, float fadeRcpLength, float fadeEndTimesRcpLength)
+{
+    float t = Remap10(roughness, fadeRcpLength, fadeEndTimesRcpLength);
+    return Smoothstep01(t);
 }

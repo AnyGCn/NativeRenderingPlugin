@@ -107,9 +107,12 @@ struct RaytracingRenderParameters
     float4 unity_SHC;
     
     float4 skyCubeHDRDecodeValues;
-    
+    float4 reflectionParams;
+
     int lightCount;
     int hasMainLightShadow;
+    int padding0;
+    int padding1;
 };
 
 struct MeshDescriptor
@@ -131,10 +134,8 @@ struct MaterialDscriptor
     void* EmissionMap;
     float4 BaseColor;
     float4 Emission;
-    float BumpScale;
-    float Metallic;
-    float Roughness;
-    float Occlusion;
+    float4 SurfaceScale;    // x: bump scale, y: occlusion, z: metallic, w: roughness
+    float4 MaterialParam;   // x: lighting Model
 };
 
 struct CameraData
@@ -232,7 +233,8 @@ enum TextureType
     eNormal,
     eGBufferMask,
     eRaytracingOutput,
-    eMainLightShadowMap,
+    eScreenSpaceDiffuse,
+    eScreenSpaceAO,
     eSkyCube,
     eTextureTypeCount,
 };

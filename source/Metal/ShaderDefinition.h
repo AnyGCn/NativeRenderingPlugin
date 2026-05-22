@@ -16,8 +16,9 @@ typedef enum AAPLRTReflectionKernelImageIndex
     AAPLRaytracingGBufferDepthIndex             = 1,
     AAPLRaytracingGBufferNormalIndex            = 2,
     AAPLRaytracingGBufferMaskIndex              = 3,
-    AAPLRaytracingMainLightShadowMap            = 4,
-    AAPLRaytracingSkyCubeMap                    = 5,
+    AAPLRaytracingScreenSpaceDiffuse            = 4,
+    AAPLRaytracingScreenSpaceAO                 = 5,
+    AAPLRaytracingSkyCubeMap                    = 6,
     AAPLRaytracingTextureCount,
 } AAPLRTReflectionKernelImageIndex;
 
@@ -178,12 +179,10 @@ struct AAPLMesh
 struct AAPLMaterial
 {
     array<texture2d<half>, AAPLMaterialTextureCount> textures [[ id( AAPLArgumentBufferIDMaterialTextures ) ]];
-    float4 _BaseColor;
-    float4 _Emission;
-    float _BumpScale;
-    float _Metallic;
-    float _Roughness;
-    float _Occlusion;
+    float4 BaseColor;
+    float4 Emission;
+    float4 SurfaceScale;    // x: bump scale, y: occlusion, z: metallic, w: roughness
+    float4 MaterialParam;   // x: lighting Model
 };
 
 struct AAPLScene
@@ -223,9 +222,12 @@ struct AAPLRenderParameter
     float4 unity_SHC;
     
     float4 skyCubeHDRDecodeValues;
-    
+    float4 reflectionParams;    // x: max roughness, y:roughnessFadeRcpLength, z:roughnessFadeEndTimesRcpLength, w: strength
+
     uint32_t lightCount;
     uint32_t hasMainLightShadow;
+    uint32_t padding0;
+    uint32_t padding1;
 };
 
 #else
@@ -243,12 +245,10 @@ struct AAPLMesh
 struct AAPLMaterial
 {
     MTLResourceID textures[AAPLMaterialTextureCount];
-    simd_float4 _BaseColor;
-    simd_float4 _Emission;
-    float _BumpScale;
-    float _Metallic;
-    float _Roughness;
-    float _Occlusion;
+    simd_float4 BaseColor;
+    simd_float4 Emission;
+    simd_float4 SurfaceScale;    // x: bump scale, y: occlusion, z: metallic, w: roughness
+    simd_float4 MaterialParam;   // x: lighting Model
 };
 
 struct AAPLScene
