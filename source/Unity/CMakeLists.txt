@@ -1,21 +1,23 @@
-target_sources(RenderingPlugin
-PRIVATE
-    IUnityLog.h
-    IUnityGraphics.h
-    IUnityInterface.h
-)
-
-if (WIN32)
-    target_sources(RenderingPlugin
+foreach(rendering_plugin_target IN LISTS RENDERING_PLUGIN_TARGETS)
+    target_sources(${rendering_plugin_target}
         PRIVATE
-            IUnityGraphicsD3D11.h
-            IUnityGraphicsD3D12.h
+            IUnityLog.h
+            IUnityGraphics.h
+            IUnityInterface.h
     )
-endif()
 
-if (Apple)
-    target_sources(RenderingPlugin
-        PRIVATE
-            IUnityGraphicsMetal.h
-    )
-endif()
+    if (WIN32)
+        target_sources(${rendering_plugin_target}
+            PRIVATE
+                IUnityGraphicsD3D11.h
+                IUnityGraphicsD3D12.h
+        )
+    endif()
+
+    if (APPLE)
+        target_sources(${rendering_plugin_target}
+            PRIVATE
+                IUnityGraphicsMetal.h
+        )
+    endif()
+endforeach()

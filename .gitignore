@@ -18,3 +18,4 @@ external/streamline/*
 projects/Android/libs/*
 projects/Android/obj/*
 source/*.o
+CMakeUserPresets.json
